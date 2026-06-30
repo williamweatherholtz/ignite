@@ -39,8 +39,20 @@ package IgniteIssues {
         :>> severity = Severity::Low;
     }
 
+    part issue004 : Issue {
+        :>> id = "1f84d1f5-997f-4d00-937b-7db79f40a408";
+        :>> title = "Ignis 72-214s baseline was Docker-bind-mount-dominated, not a like-for-like algorithm comparison";
+        :>> createdAt = "2026-06-30";
+        :>> createdBy = "ai";
+        :>> description = "The headline 'Ignite is thousands of times faster than Ignis' is confounded. Ignis's 72-214s was measured in Docker (bind-mount filesystem). A controlled baseline running Ignis's EXACT sequential per-file-stat walk in Node over the SAME native vault is only 657ms cold / 216ms warm - so Docker's host<->VM filesystem bridge (~100-300x), not the Node algorithm, dominated the original number. The clean same-filesystem Rust-vs-Node speedup is ~11-33x (plus Ignite removes event-loop head-of-line blocking). For an honest end-to-end claim, Ignite must be benchmarked in Ignis's ACTUAL deployment context (Docker, same mount). Also implies a large share of the user's real-world pain is the Docker bind mount - a deployment concern partly orthogonal to the rewrite.";
+        :>> discoveredInField = true;
+        :>> relatedTask = "dockerContextBench";
+        :>> severity = Severity::Medium;
+    }
+
     // ---- triage: each Issue is resolved by its IgniteBacklog action (computed when done) ----
     #Resolves dependency from realVaultBench to issue001;
     #Resolves dependency from ctimeUnixParity to issue002;
     #Resolves dependency from gitTreeInclusionParity to issue003;
+    #Resolves dependency from dockerContextBench to issue004;
 }
