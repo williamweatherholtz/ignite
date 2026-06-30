@@ -28,7 +28,7 @@ impl VaultRegistry {
         };
         let vaults: HashMap<String, VaultIndex> = dirs
             .into_par_iter()
-            .map(|(name, path)| (name, VaultIndex::build(&path)))
+            .map(|(name, path)| (name, VaultIndex::build_live(&path)))
             .collect();
         Self { vaults }
     }

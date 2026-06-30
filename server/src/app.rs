@@ -104,4 +104,40 @@ mod tests {
             .unwrap();
         assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
     }
+
+    async fn fetch_tree(reg: &Arc<VaultRegistry>) -> serde_json::Value {
+        let resp = app(Arc::clone(reg))
+            .oneshot(
+                Request::builder()
+                    .uri("/api/fs/tree?vault=Games")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        serde_json::from_slice(&bytes).unwrap()
+    }
+
+    #[tokio::test]
+    async fn fs_tree_reflects_a_live_change() {
+        // registry uses the LIVE build, so a file created in the vault after startup
+        // should surface through the handler once the watcher applies it.
+        let (dir, reg) = registry_with_one_vault();
+        assert!(fetch_tree(&reg).await.get("z.md").is_none());
+
+        fs::write(dir.path().join("Games").join("z.md"), b"live!").unwrap();
+
+        let mut ok = false;
+        for _ in 0..60 {
+            if fetch_tree(&reg).await.get("z.md").is_some() {
+                ok = true;
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(50));
+        }
+        assert!(ok, "GET /api/fs/tree did not reflect a live-created file");
+    }
 }
