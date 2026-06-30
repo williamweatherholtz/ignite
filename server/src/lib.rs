@@ -4,6 +4,7 @@
 pub mod app;
 pub mod index;
 pub mod registry;
+pub mod ws;
 
 pub use index::{build_tree, tree_to_value, NodeType, Tree, TreeEntry, VaultIndex};
 pub use registry::VaultRegistry;

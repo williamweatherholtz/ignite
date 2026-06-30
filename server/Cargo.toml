@@ -19,9 +19,11 @@ ignore = "0.4"
 rayon = "1"
 arc-swap = "1"
 notify-debouncer-full = "0.3"
-tokio = { version = "1", features = ["rt-multi-thread", "macros", "net"] }
-axum = "0.8"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "time", "sync"] }
+axum = { version = "0.8", features = ["ws"] }
+futures-util = "0.3"
 
 [dev-dependencies]
 tempfile = "3"
 tower = { version = "0.5", features = ["util"] }
+tokio-tungstenite = "0.24"

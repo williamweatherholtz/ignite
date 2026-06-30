@@ -9,6 +9,11 @@ use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use tokio::sync::broadcast;
+
+/// Capacity of each vault's change-event broadcast ring. A client that lags past this
+/// gets a `Lagged` (drops oldest); the WS layer recovers rather than buffering unboundedly.
+const EVENT_CHANNEL_CAPACITY: usize = 1024;
 
 /// Kept-alive watcher handle (dropping it stops watching). Behind `Arc<Mutex<_>>`
 /// so `VaultIndex` stays `Send + Sync + Clone`; we never need to lock it, only hold it.
@@ -135,13 +140,20 @@ pub fn tree_to_value(tree: &Tree) -> serde_json::Value {
 /// subtree under it), then atomically swap in the result. Kind-agnostic — works for
 /// create/modify/delete/rename/folder by reading disk truth per path. Incremental:
 /// only the affected paths are touched, never a full re-walk.
-fn apply_paths(tree: &ArcSwap<Tree>, root: &Path, paths: &[PathBuf]) {
+fn apply_paths(
+    tree: &ArcSwap<Tree>,
+    root: &Path,
+    paths: &[PathBuf],
+    events_tx: &broadcast::Sender<String>,
+) {
     let mut next: Tree = (**tree.load()).clone();
     for p in paths {
         let rel = match p.strip_prefix(root) {
             Ok(r) if !r.as_os_str().is_empty() => r.to_string_lossy().replace('\\', "/"),
             _ => continue,
         };
+        // presence BEFORE this change decides created (new) vs modified (existing)
+        let existed = next.contains_key(&rel);
         match std::fs::symlink_metadata(p) {
             Ok(meta) => {
                 let node = if meta.is_dir() {
@@ -161,12 +173,33 @@ fn apply_paths(tree: &ArcSwap<Tree>, root: &Path, paths: &[PathBuf]) {
                         ctime,
                     }
                 };
+                // derive the Ignis event type, then publish ONCE (serialize here, not per client)
+                let kind = match (node.node_type, existed) {
+                    (NodeType::Directory, false) => Some("folder-created"),
+                    (NodeType::Directory, true) => None, // dir already known; no dir-modified event
+                    (NodeType::File, false) => Some("created"),
+                    (NodeType::File, true) => Some("modified"),
+                };
+                if let Some(kind) = kind {
+                    let msg = match node.node_type {
+                        NodeType::Directory => serde_json::json!({ "type": kind, "path": rel }),
+                        NodeType::File => serde_json::json!({
+                            "type": kind, "path": rel,
+                            "stat": { "size": node.size, "mtime": node.mtime, "ctime": node.ctime }
+                        }),
+                    };
+                    let _ = events_tx.send(msg.to_string());
+                }
                 next.insert(rel, node);
             }
             Err(_) => {
-                next.remove(&rel);
+                let removed = next.remove(&rel).is_some();
                 let prefix = format!("{rel}/");
                 next.retain(|k, _| !k.starts_with(&prefix));
+                if removed {
+                    let msg = serde_json::json!({ "type": "deleted", "path": rel });
+                    let _ = events_tx.send(msg.to_string());
+                }
             }
         }
     }
@@ -180,6 +213,9 @@ fn apply_paths(tree: &ArcSwap<Tree>, root: &Path, paths: &[PathBuf]) {
 pub struct VaultIndex {
     root: PathBuf,
     tree: Arc<ArcSwap<Tree>>,
+    // Per-vault change-event broadcast: the watcher publishes typed events (serialized
+    // once), WS clients subscribe. A static index has a sender no one publishes to.
+    events_tx: broadcast::Sender<String>,
     // Kept alive for the index's lifetime; `None` for a static (unwatched) index.
     _watcher: Option<Arc<Mutex<LiveDebouncer>>>,
 }
@@ -198,9 +234,11 @@ impl VaultIndex {
     /// Build a STATIC index by walking `root` once. The snapshot does not track later
     /// filesystem changes (used by benchmarks and where liveness isn't wanted).
     pub fn build(root: &Path) -> Self {
+        let (events_tx, _) = broadcast::channel(EVENT_CHANNEL_CAPACITY);
         Self {
             root: root.to_path_buf(),
             tree: Arc::new(ArcSwap::from_pointee(build_tree(root))),
+            events_tx,
             _watcher: None,
         }
     }
@@ -211,11 +249,13 @@ impl VaultIndex {
     pub fn build_live(root: &Path) -> Self {
         let root_buf = root.to_path_buf();
         let tree = Arc::new(ArcSwap::from_pointee(Tree::new()));
+        let (events_tx, _) = broadcast::channel(EVENT_CHANNEL_CAPACITY);
 
         // Start the watcher FIRST (on an empty tree), then reconcile, so any change in
         // the build/watch gap is captured — either by a queued event or by the reconcile.
         let tree_cb = Arc::clone(&tree);
         let root_cb = root_buf.clone();
+        let events_cb = events_tx.clone();
         let mut debouncer = new_debouncer(
             Duration::from_millis(300),
             None,
@@ -223,7 +263,7 @@ impl VaultIndex {
                 if let Ok(events) = res {
                     let paths: Vec<PathBuf> = events.iter().flat_map(|e| e.paths.clone()).collect();
                     if !paths.is_empty() {
-                        apply_paths(&tree_cb, &root_cb, &paths);
+                        apply_paths(&tree_cb, &root_cb, &paths, &events_cb);
                     }
                 }
             },
@@ -238,6 +278,7 @@ impl VaultIndex {
         let idx = Self {
             root: root_buf,
             tree,
+            events_tx,
             _watcher: Some(Arc::new(Mutex::new(debouncer))),
         };
         idx.reconcile(); // authoritative full walk after the watcher is live
@@ -259,6 +300,13 @@ impl VaultIndex {
     /// The vault root this index was built from.
     pub fn root(&self) -> &Path {
         &self.root
+    }
+
+    /// Subscribe to this vault's live change events. Each event is a JSON string in the
+    /// Ignis shape (`{type, path, stat?}`), serialized once by the watcher and fanned out
+    /// to all subscribers. A lagging subscriber receives `Lagged` (oldest dropped).
+    pub fn subscribe(&self) -> broadcast::Receiver<String> {
+        self.events_tx.subscribe()
     }
 }
 
