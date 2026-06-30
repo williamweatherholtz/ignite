@@ -50,8 +50,20 @@ package IgniteIssues {
         :>> severity = Severity::Medium;
     }
 
+    part issue005 : Issue {
+        :>> id = "55b6a8c7-6718-4525-a892-d4cdaca8c67b";
+        :>> title = "srTreeFast cold contract (<1s) missed through a Docker bind mount (2.74s)";
+        :>> createdAt = "2026-06-30";
+        :>> createdBy = "ai";
+        :>> description = "issue004's Docker-context benchmark revealed Ignite's COLD index build takes 2.74s for the 2,972-entry Games vault when the vault is a Windows-host bind mount (vs 20ms native) - over srTreeFast's <1s cold threshold. Impact is LOW because Ignite builds indexes once at startup (registry.rs eager build) so every per-request serve is warm (~2.3ms in Docker); the 2.74s is a one-time boot cost per vault, not per request (unlike Ignis, which re-walked every request). Mitigations: prefer a Docker named volume or WSL2-native vault path over a Windows-host bind mount; or run Ignite natively. Open question: should srTreeFast's cold threshold be qualified to native storage, or carry a separate mounted-FS bound.";
+        :>> discoveredInField = false;
+        :>> relatedTask = "dockerColdMitigation";
+        :>> severity = Severity::Medium;
+    }
+
     // ---- triage: each Issue is resolved by its IgniteBacklog action (computed when done) ----
     #Resolves dependency from realVaultBench to issue001;
+    #Resolves dependency from dockerColdMitigation to issue005;
     #Resolves dependency from ctimeUnixParity to issue002;
     #Resolves dependency from gitTreeInclusionParity to issue003;
     #Resolves dependency from dockerContextBench to issue004;
