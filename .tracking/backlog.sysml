@@ -8,6 +8,7 @@ package IgniteBacklog {
     action def IgniteBuild {
         action realVaultBench;
         verification realVaultBenchDoD : Test { :>> id = "91419081-70c3-48d2-ac10-f41b9f54902c"; :>> method = VerificationMethod::test; :>> procedureText = "Resolves issue001. Benchmark VaultIndex::build + GET /api/fs/tree against a REAL ~2,500-file vault on true storage (disk/NAS), not a fast tempdir. VERIFY: cold build < 1 s and warm serve < 50 ms on real storage; record the measured numbers as evidence for srTreeFast."; }
+        part realVaultBenchDoDR1 : TestResult { :>> id = "6f4194d4-3e81-4bec-bd5b-3e1df96ae950"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "fb718be"; :>> judgedAt = "2026-06-30"; :>> judgedBy = "ai"; :>> notes = "Real-vault benchmark on C:/Users/WilliamWeatherholtz/Downloads/Games (2,972 entries = 2,557 files + 416 dirs - the vault Ignis took 72-214s on). Release build: COLD VaultIndex::build 19.96ms (< 1s contract), WARM serve avg 3.99ms (< 50ms contract). ~3,600-10,700x faster than Ignis. srTreeFast confirmed on real storage."; }
 
         action ctimeUnixParity;
         verification ctimeUnixParityDoD : Test { :>> id = "028a3fcc-ebae-48d9-b12b-afd7693b8913"; :>> method = VerificationMethod::inspect; :>> procedureText = "Resolves issue002. Determine what Ignis c9656b8 serves for ctimeMs on Unix (inode change time) vs Ignite's created()-fallback-modified(); align TreeEntry.ctime for wire-parity, or document the accepted platform difference with rationale."; }
