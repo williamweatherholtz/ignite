@@ -1,6 +1,7 @@
 //! Vault discovery + the per-vault warm index registry.
 
 use crate::index::VaultIndex;
+use rayon::prelude::*;
 use std::collections::HashMap;
 use std::path::Path;
 
@@ -12,19 +13,23 @@ pub struct VaultRegistry {
 
 impl VaultRegistry {
     /// Discover vaults as the immediate subdirectories of `vault_root` and build
-    /// a warm index for each. Non-directory entries are ignored.
+    /// a warm index for each. Non-directory entries are ignored. Indexes are built
+    /// in PARALLEL across vaults (dCritiqueEfficiency): startup is bounded by the
+    /// slowest single vault, not the sum — material for multi-vault setups on slow
+    /// storage (e.g. ~6 vaults over a Docker bind mount).
     pub fn discover(vault_root: &Path) -> Self {
-        let mut vaults = HashMap::new();
-        if let Ok(entries) = std::fs::read_dir(vault_root) {
-            for entry in entries.flatten() {
-                let is_dir = entry.file_type().map(|t| t.is_dir()).unwrap_or(false);
-                if !is_dir {
-                    continue;
-                }
-                let name = entry.file_name().to_string_lossy().into_owned();
-                vaults.insert(name, VaultIndex::build(&entry.path()));
-            }
-        }
+        let dirs: Vec<(String, std::path::PathBuf)> = match std::fs::read_dir(vault_root) {
+            Ok(entries) => entries
+                .flatten()
+                .filter(|e| e.file_type().map(|t| t.is_dir()).unwrap_or(false))
+                .map(|e| (e.file_name().to_string_lossy().into_owned(), e.path()))
+                .collect(),
+            Err(_) => Vec::new(),
+        };
+        let vaults: HashMap<String, VaultIndex> = dirs
+            .into_par_iter()
+            .map(|(name, path)| (name, VaultIndex::build(&path)))
+            .collect();
         Self { vaults }
     }
 
