@@ -3,6 +3,6 @@
 package ProjectActors {
     private import EngineElement::*;
 
-    part you : Person { :>> name = "Your Name"; :>> email = "you@example.com"; }
-    part ai : Actor { :>> name = "AI assistant"; :>> kind = ActorKind::ai; }
+    part will : Person { :>> name = "William Weatherholtz"; :>> email = "0612@asirobots.com"; }
+    part ai : Actor { :>> name = "Claude (AI assistant)"; :>> kind = ActorKind::ai; }
 }
