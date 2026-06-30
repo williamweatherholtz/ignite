@@ -61,8 +61,32 @@ package IgniteIssues {
         :>> severity = Severity::Medium;
     }
 
+    part issue006 : Issue {
+        :>> id = "74a21b1c-b101-4650-9f6d-c93fb5cf6997";
+        :>> title = "Live watcher has no auto-restart on watcher error -> silent staleness can return";
+        :>> createdAt = "2026-06-30";
+        :>> createdBy = "ai";
+        :>> description = "Sprint 5 caveat: if the OS file watcher errors out, nothing re-arms it; reconcile() is the intended recovery but is not auto-triggered by a watcher-failure signal. A dead watcher silently re-introduces exactly the staleness dCritiqueCorrectness #1 fixes. Fix: detect watcher error events and re-arm + reconcile (or periodically reconcile as a backstop).";
+        :>> discoveredInField = false;
+        :>> relatedTask = "watcherAutoRestart";
+        :>> severity = Severity::Medium;
+    }
+
+    part issue007 : Issue {
+        :>> id = "44e2bdcc-cb36-4426-8299-a97f016731be";
+        :>> title = "Bulk move of a populated directory may briefly under-populate the index";
+        :>> createdAt = "2026-06-30";
+        :>> createdBy = "ai";
+        :>> description = "Sprint 5 caveat: apply_paths upserts a moved-in directory entry but does not eagerly walk its new populated subtree; it relies on recursive notify emitting per-child events (and reconcile() as a backstop). A bulk move could briefly under-populate the tree until child events arrive or a reconcile runs. Fix: on a directory create/move event, walk the new subtree eagerly.";
+        :>> discoveredInField = false;
+        :>> relatedTask = "bulkMoveSubtreeWalk";
+        :>> severity = Severity::Low;
+    }
+
     // ---- triage: each Issue is resolved by its IgniteBacklog action (computed when done) ----
     #Resolves dependency from realVaultBench to issue001;
+    #Resolves dependency from watcherAutoRestart to issue006;
+    #Resolves dependency from bulkMoveSubtreeWalk to issue007;
     #Resolves dependency from dockerColdMitigation to issue005;
     #Resolves dependency from ctimeUnixParity to issue002;
     #Resolves dependency from gitTreeInclusionParity to issue003;

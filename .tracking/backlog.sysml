@@ -22,5 +22,11 @@ package IgniteBacklog {
 
         action dockerColdMitigation;
         verification dockerColdMitigationDoD : Test { :>> id = "2e2a4193-7dda-428b-b639-07126ee09776"; :>> method = VerificationMethod::inspect; :>> procedureText = "Resolves issue005. Ignite's cold index build misses srTreeFast's <1s threshold through a Docker bind mount (2.74s for 2,972 entries; 20ms native). It is startup-only (warm-at-startup means per-request serves stay ~2ms), so impact is low - but document the deployment guidance (prefer a Docker named VOLUME or a WSL2-native vault path over a Windows-host bind mount; or run Ignite natively) and decide whether srTreeFast's cold threshold should carry a 'native storage' qualifier or a separate mounted-FS bound. No fabrication; record the chosen disposition."; }
+
+        action watcherAutoRestart;
+        verification watcherAutoRestartDoD : Test { :>> id = "fa95288b-e06d-475b-811e-40cb87e73e69"; :>> method = VerificationMethod::test; :>> procedureText = "Resolves issue006. Detect file-watcher error/termination and auto-recover: re-arm the watcher and reconcile() (and/or a periodic reconcile backstop) so a dead watcher cannot silently re-introduce staleness. VERIFY: a test that simulates watcher failure and asserts the index re-syncs; clippy + cargo test + keel green."; }
+
+        action bulkMoveSubtreeWalk;
+        verification bulkMoveSubtreeWalkDoD : Test { :>> id = "5b3ade6b-0f43-47fd-a944-bf1d0dad1733"; :>> method = VerificationMethod::test; :>> procedureText = "Resolves issue007. On a directory create/move event, eagerly walk the new subtree in apply_paths instead of relying solely on per-child notify events + reconcile. VERIFY: a test that moves a populated directory into the vault and asserts all descendants appear in the index promptly; clippy + cargo test + keel green."; }
     }
 }
