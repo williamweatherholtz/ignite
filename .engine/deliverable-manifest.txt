@@ -4,3 +4,4 @@
 # Empty for a new project — add an entry when you have a deliverable-source-dependent verification.
 task: storyTreeFast | server/src/index.rs server/src/registry.rs server/src/app.rs server/src/main.rs server/src/lib.rs server/Cargo.toml
 task: storyLiveIndex | server/src/index.rs server/src/registry.rs server/src/app.rs server/Cargo.toml
+task: storyWsLiveSync | server/src/ws.rs server/src/index.rs server/src/app.rs server/src/lib.rs server/Cargo.toml

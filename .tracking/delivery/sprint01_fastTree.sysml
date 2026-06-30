@@ -26,6 +26,7 @@ package IgniteDeliveryS01 {
         part storyTreeFastDoDR1 : TestResult { :>> id = "dc04f3c5-dbda-4ef2-a201-0b4c447d4a8c"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "bac82fb"; :>> judgedAt = "2026-06-30"; :>> judgedBy = "ai"; :>> notes = "Verified live: 10 tests pass (axum oneshot integration + 2 perf), clippy -D warnings clean, fmt. On a SYNTHETIC ~2,800-entry vault: cold build 24.9ms (< 1s), warm serve 6.8ms (< 50ms). CAVEATS (tracked): perf measured on a fast tempdir, not a real vault (issue001); ctime=created() differs from Ignis on Unix (issue002); .git/.obsidian tree-inclusion vs Ignis unconfirmed (issue003). 'Warm' = built-and-cached, not yet watcher-maintained (srLiveSync, future)."; }
         part storyTreeFastDoDR2 : TestResult { :>> id = "6bae0346-a986-4765-a5ec-795312443143"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "a7f5e78"; :>> judgedAt = "2026-06-30"; :>> judgedBy = "ai"; }
         part storyTreeFastDoDR3 : TestResult { :>> id = "8c9580e4-aff4-47f3-beec-eeaa837319e9"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "882a80e"; :>> judgedAt = "2026-06-30"; :>> judgedBy = "ai"; }
+        part storyTreeFastDoDR4 : TestResult { :>> id = "6573ccec-f137-4e26-87ac-6c1c9cea113e"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "80d878e"; :>> judgedAt = "2026-06-30"; :>> judgedBy = "ai"; }
     }
 
     // ---- Ceremony gates (D0047/D0049). Only the refine gate (DoR) has passed: the sprint is PLANNED. ----
