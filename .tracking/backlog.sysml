@@ -28,5 +28,8 @@ package IgniteBacklog {
 
         action bulkMoveSubtreeWalk;
         verification bulkMoveSubtreeWalkDoD : Test { :>> id = "5b3ade6b-0f43-47fd-a944-bf1d0dad1733"; :>> method = VerificationMethod::test; :>> procedureText = "Resolves issue007. On a directory create/move event, eagerly walk the new subtree in apply_paths instead of relying solely on per-child notify events + reconcile. VERIFY: a test that moves a populated directory into the vault and asserts all descendants appear in the index promptly; clippy + cargo test + keel green."; }
+
+        action fsSpawnBlocking;
+        verification fsSpawnBlockingDoD : Test { :>> id = "b18f52ce-9f5a-4756-a5d6-d76e6753eb57"; :>> method = VerificationMethod::test; :>> procedureText = "Resolves issue008. Move the fs CRUD handlers' blocking std::fs calls onto tokio::task::spawn_blocking (or tokio::fs) so heavy concurrent I/O cannot stall tokio worker threads. VERIFY: handlers behave identically (all fs tests stay green); clippy + cargo test + keel green."; }
     }
 }

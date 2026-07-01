@@ -83,8 +83,20 @@ package IgniteIssues {
         :>> severity = Severity::Low;
     }
 
+    part issue008 : Issue {
+        :>> id = "576843c7-db84-4f88-b196-9ed27ebcd8bd";
+        :>> title = "fs CRUD handlers use blocking std::fs on the async runtime";
+        :>> createdAt = "2026-06-30";
+        :>> createdBy = "ai";
+        :>> description = "Sprint 7 caveat: the fs CRUD handlers call blocking std::fs directly on tokio worker threads. Single-file ops are fast so this is not the head-of-line blocking Ignis had (the big walk is already off-thread), but under high concurrent write/read load blocking calls can stall executor threads. Refinement: move the blocking fs calls to tokio::task::spawn_blocking (or tokio::fs). Low priority.";
+        :>> discoveredInField = false;
+        :>> relatedTask = "fsSpawnBlocking";
+        :>> severity = Severity::Low;
+    }
+
     // ---- triage: each Issue is resolved by its IgniteBacklog action (computed when done) ----
     #Resolves dependency from realVaultBench to issue001;
+    #Resolves dependency from fsSpawnBlocking to issue008;
     #Resolves dependency from watcherAutoRestart to issue006;
     #Resolves dependency from bulkMoveSubtreeWalk to issue007;
     #Resolves dependency from dockerColdMitigation to issue005;
