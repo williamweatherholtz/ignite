@@ -6,8 +6,9 @@
 # Downstream-overridable (like critique-policy.toml): a fresh `keel init` project edits these to its own
 # reproducible gate. Absent file => `keel reverify` is a no-op that reports "no reverify command configured".
 #
-# This project's gate (mirrors .github/workflows/ci.yml + the pre-commit Rust checks):
+# This project's gate. The Rust deliverable lives in server/ (not a repo-root workspace),
+# so target its manifest explicitly (the shipped default assumed a root Cargo.toml).
 commands = [
-    "cargo test --workspace --release",
-    "cargo clippy --workspace --all-targets -- -D warnings",
+    "cargo test --manifest-path server/Cargo.toml --release",
+    "cargo clippy --manifest-path server/Cargo.toml --all-targets -- -D warnings",
 ]
