@@ -34,6 +34,8 @@ pub fn app(reg: Arc<VaultRegistry>) -> Router {
         .route("/api/fs/tree", get(fs_tree))
         .route("/ws", get(crate::ws::ws_handler))
         .merge(crate::fs_routes::routes())
+        .merge(crate::vault_routes::routes())
+        .layer(tower_http::compression::CompressionLayer::new())
         .with_state(reg)
 }
 
@@ -305,5 +307,89 @@ mod tests {
             std::thread::sleep(std::time::Duration::from_millis(50));
         }
         assert!(ok, "GET /api/fs/tree did not reflect a live-created file");
+    }
+
+    // ---- vault + bootstrap routes (sprint 8) ----
+
+    async fn get_json(reg: &Arc<VaultRegistry>, uri: &str) -> (StatusCode, serde_json::Value) {
+        let resp = app(Arc::clone(reg))
+            .oneshot(Request::builder().uri(uri).body(Body::empty()).unwrap())
+            .await
+            .unwrap();
+        let status = resp.status();
+        let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let v = serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null);
+        (status, v)
+    }
+
+    #[tokio::test]
+    async fn vault_list_returns_discovered_vaults() {
+        let (_dir, reg) = registry_with_one_vault();
+        let (status, v) = get_json(&reg, "/api/vault/list").await;
+        assert_eq!(status, StatusCode::OK);
+        let arr = v.as_array().expect("vault/list is an array");
+        assert_eq!(arr.len(), 1);
+        assert_eq!(arr[0]["id"], "Games");
+        assert_eq!(arr[0]["name"], "Games");
+        assert!(arr[0]["path"].as_str().unwrap().contains("Games"));
+    }
+
+    #[tokio::test]
+    async fn vault_info_returns_five_fields() {
+        let (_dir, reg) = registry_with_one_vault();
+        let (status, v) = get_json(&reg, "/api/vault/info?vault=Games").await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(v["id"], "Games");
+        assert_eq!(v["name"], "Games");
+        assert!(v["path"].is_string());
+        assert!(v["platform"].is_string());
+        assert!(v["version"].is_string());
+    }
+
+    #[tokio::test]
+    async fn vault_info_defaults_to_first_when_vault_omitted() {
+        let (_dir, reg) = registry_with_one_vault();
+        let (status, v) = get_json(&reg, "/api/vault/info").await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(v["id"], "Games");
+    }
+
+    #[tokio::test]
+    async fn vault_info_unknown_vault_404() {
+        let (_dir, reg) = registry_with_one_vault();
+        let (status, _v) = get_json(&reg, "/api/vault/info?vault=Nope").await;
+        assert_eq!(status, StatusCode::NOT_FOUND);
+    }
+
+    #[tokio::test]
+    async fn bootstrap_returns_the_full_bundle() {
+        let (_dir, reg) = registry_with_one_vault();
+        let (status, v) = get_json(&reg, "/api/bootstrap?vault=Games").await;
+        assert_eq!(status, StatusCode::OK);
+        // all six top-level keys
+        assert_eq!(v["vault"]["id"], "Games");
+        assert!(v["vault"]["platform"].is_string());
+        assert!(v["vault"]["version"].is_string());
+        assert!(v["vaultList"].is_array());
+        assert_eq!(v["vaultList"][0]["name"], "Games");
+        // the live tree, Ignis shape
+        assert_eq!(v["tree"]["a.md"]["type"], "file");
+        assert_eq!(v["tree"]["a.md"]["size"], 5);
+        assert!(v["plugins"].is_array() && v["plugins"].as_array().unwrap().is_empty());
+        assert!(v["virtualPlugins"].is_array());
+        // settings keys (Ignis defaults)
+        assert_eq!(v["settings"]["contentCacheBytes"], 52_428_800);
+        assert_eq!(v["settings"]["inputCacheBytes"], 209_715_200);
+        assert_eq!(v["settings"]["inputCacheTtlMs"], 300_000);
+        assert!(v["settings"]["directFetchHosts"].is_array());
+    }
+
+    #[tokio::test]
+    async fn bootstrap_unknown_vault_404() {
+        let (_dir, reg) = registry_with_one_vault();
+        let (status, _v) = get_json(&reg, "/api/bootstrap?vault=Nope").await;
+        assert_eq!(status, StatusCode::NOT_FOUND);
     }
 }

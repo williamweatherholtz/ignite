@@ -5,6 +5,7 @@ pub mod app;
 pub mod fs_routes;
 pub mod index;
 pub mod registry;
+pub mod vault_routes;
 pub mod ws;
 
 pub use index::{build_tree, tree_to_value, NodeType, Tree, TreeEntry, VaultIndex};
