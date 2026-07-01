@@ -2,6 +2,7 @@
 //! Obsidian server. Wire-compatible with Ignis c9656b8.
 
 pub mod app;
+pub mod fs_routes;
 pub mod index;
 pub mod registry;
 pub mod ws;

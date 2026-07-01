@@ -459,6 +459,8 @@ version = "0.1.0"
 dependencies = [
  "arc-swap",
  "axum",
+ "base64",
+ "filetime",
  "futures-util",
  "ignore",
  "notify-debouncer-full",

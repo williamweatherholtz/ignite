@@ -33,6 +33,7 @@ pub fn app(reg: Arc<VaultRegistry>) -> Router {
     Router::new()
         .route("/api/fs/tree", get(fs_tree))
         .route("/ws", get(crate::ws::ws_handler))
+        .merge(crate::fs_routes::routes())
         .with_state(reg)
 }
 
