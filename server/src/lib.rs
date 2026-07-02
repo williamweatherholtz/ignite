@@ -4,6 +4,7 @@
 pub mod app;
 pub mod fs_routes;
 pub mod index;
+pub mod proxy_routes;
 pub mod registry;
 pub mod static_routes;
 pub mod vault_routes;
