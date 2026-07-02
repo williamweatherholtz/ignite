@@ -7,7 +7,9 @@
 # verification (sprint15 DoD) — the AI verified the image builds + the server smoke-responds.
 
 # ---- stage 1: Rust server ----
-FROM rust:1 AS rustbuild
+# Pin bookworm to match the node:22-slim runtime's glibc (2.36) — a plain `rust:1` (trixie)
+# links GLIBC_2.39 which the runtime lacks, so the binary won't run. Keep these in lockstep.
+FROM rust:1-bookworm AS rustbuild
 WORKDIR /build
 COPY server/ ./server/
 RUN cargo build --release --manifest-path server/Cargo.toml \

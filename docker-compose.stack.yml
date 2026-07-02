@@ -1,0 +1,43 @@
+# Ignite full stack — Ignite behind Caddy for automatic HTTPS + WebSocket pass-through.
+# Obsidian needs HTTPS (or localhost) for full functionality, so remote self-hosting wants TLS.
+#
+#   Local (self-signed, https://localhost):   docker compose -f docker-compose.stack.yml up --build
+#   Real domain (auto Let's Encrypt):          IGNITE_DOMAIN=notes.example.com VAULTS_DIR=/srv/vaults \
+#                                              docker compose -f docker-compose.stack.yml up -d --build
+services:
+  ignite:
+    build: .
+    image: ignite:dev
+    expose:
+      - "8080"            # internal only; Caddy is the public edge
+    volumes:
+      - ${VAULTS_DIR:-./vaults}:/vaults
+      - ignite-obsidian:/app/obsidian-app   # persist Obsidian so it isn't re-downloaded
+      - ignite-data:/app/data
+    environment:
+      - OBSIDIAN_VERSION=1.12.7
+      - PORT=8080
+      # - PUID=1000
+      # - PGID=1000
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data       # persisted certs
+      - caddy-config:/config
+    environment:
+      - IGNITE_DOMAIN=${IGNITE_DOMAIN:-localhost}
+    depends_on:
+      - ignite
+    restart: unless-stopped
+
+volumes:
+  ignite-obsidian:
+  ignite-data:
+  caddy-data:
+  caddy-config:

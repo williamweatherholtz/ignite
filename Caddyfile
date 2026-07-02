@@ -1,0 +1,7 @@
+# Ignite edge proxy. Set IGNITE_DOMAIN to a real hostname for automatic Let's Encrypt TLS;
+# defaults to localhost (Caddy's internal self-signed CA -> https://localhost).
+# reverse_proxy transparently upgrades the /ws WebSocket.
+{$IGNITE_DOMAIN:localhost} {
+	encode zstd gzip
+	reverse_proxy ignite:8080
+}
