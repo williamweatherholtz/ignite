@@ -15,11 +15,24 @@ async fn main() {
         .unwrap_or(8080);
 
     let registry = Arc::new(VaultRegistry::discover(Path::new(&vault_root)));
-    println!(
-        "ignite-server: indexed {} vault(s) from {vault_root}: {:?}",
-        registry.names().len(),
-        registry.names()
-    );
+    let resolved = Path::new(&vault_root)
+        .canonicalize()
+        .map(|p| p.display().to_string())
+        .unwrap_or_else(|_| vault_root.clone());
+    let names = registry.names();
+    if names.is_empty() {
+        eprintln!(
+            "[ignite] WARNING: no vaults found under VAULT_ROOT='{vault_root}' (resolved: {resolved}). \
+             Each immediate SUBDIRECTORY of VAULT_ROOT is a vault. In Docker, check your /vaults bind \
+             mount: VAULTS_DIR must point at a directory that CONTAINS your vault folders (and be shared \
+             with Docker Desktop). The browser will show a 'no vaults' page until one is mounted."
+        );
+    } else {
+        println!(
+            "[ignite] indexed {} vault(s) from {vault_root} (resolved: {resolved}): {names:?}",
+            names.len()
+        );
+    }
 
     let addr = SocketAddr::from(([0, 0, 0, 0], port));
     let listener = tokio::net::TcpListener::bind(addr)

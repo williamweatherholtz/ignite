@@ -112,9 +112,17 @@ pub fn cache_control_for(path: &str, has_version: bool) -> Option<&'static str> 
 }
 
 /// Build the shell HTML from the on-disk template + Obsidian bundle index.html.
-pub fn build_shell(cfg: &StaticConfig) -> std::io::Result<String> {
-    let template = std::fs::read_to_string(cfg.assets_dir.join("index.html"))?;
-    let obsidian = std::fs::read_to_string(cfg.obsidian_assets.join("index.html"))?;
+pub fn build_shell(cfg: &StaticConfig) -> Result<String, String> {
+    let tpl = cfg.assets_dir.join("index.html");
+    let template = std::fs::read_to_string(&tpl)
+        .map_err(|e| format!("ignis template not readable at {} ({e})", tpl.display()))?;
+    let ob = cfg.obsidian_assets.join("index.html");
+    let obsidian = std::fs::read_to_string(&ob).map_err(|e| {
+        format!(
+            "Obsidian assets not readable at {} ({e}) - has the Obsidian bundle been downloaded/extracted?",
+            ob.display()
+        )
+    })?;
     Ok(build_index_html(
         &template,
         &obsidian,
@@ -123,8 +131,46 @@ pub fn build_shell(cfg: &StaticConfig) -> std::io::Result<String> {
     ))
 }
 
+/// A minimal human-readable HTML page (for the no-vaults + shell-error states) so the browser
+/// shows a clear message instead of a blank 500.
+fn diagnostic_page(status: StatusCode, title: &str, body_html: &str) -> Response {
+    let html = format!(
+        "<!doctype html><html><head><meta charset=\"utf-8\"><title>Ignite \u{2014} {title}</title>\
+<style>body{{font:15px system-ui,-apple-system,sans-serif;max-width:42em;margin:4em auto;padding:0 1.2em;color:#222;line-height:1.5}}\
+h1{{font-size:1.35em}} code{{background:#f4f4f4;padding:.1em .35em;border-radius:3px}}</style></head>\
+<body><h1>Ignite \u{2014} {title}</h1><p>{body_html}</p></body></html>"
+    );
+    (
+        status,
+        [
+            (CONTENT_TYPE, "text/html; charset=utf-8"),
+            (CACHE_CONTROL, "no-cache"),
+        ],
+        html,
+    )
+        .into_response()
+}
+
+fn escape_html(s: &str) -> String {
+    s.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;")
+}
+
 /// GET / and /index.html — the app shell (Content-Type text/html, Cache-Control no-cache).
-pub(crate) async fn index_handler(Extension(cfg): Extension<Arc<StaticConfig>>) -> Response {
+pub(crate) async fn index_handler(
+    State(reg): State<Arc<VaultRegistry>>,
+    Extension(cfg): Extension<Arc<StaticConfig>>,
+) -> Response {
+    // No vaults -> a clear message, not the (blank) Obsidian shell.
+    if reg.names().is_empty() {
+        return diagnostic_page(
+            StatusCode::OK,
+            "No vaults found",
+            "The server is running, but no vaults are mounted. Each immediate subdirectory of \
+             <code>VAULT_ROOT</code> (default <code>/vaults</code>) is a vault. In Docker, mount a \
+             directory that <em>contains</em> your vault folders at <code>/vaults</code> \
+             (e.g. <code>-v /path/to/vaults:/vaults</code>), then reload this page.",
+        );
+    }
     match build_shell(&cfg) {
         Ok(html) => (
             [
@@ -134,7 +180,16 @@ pub(crate) async fn index_handler(Extension(cfg): Extension<Arc<StaticConfig>>) 
             html,
         )
             .into_response(),
-        Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        // Assets missing/unreadable -> show WHY in the browser instead of a blank 500.
+        Err(msg) => diagnostic_page(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Couldn't build the app shell",
+            &format!(
+                "The server is up but could not assemble the Obsidian shell:<br><br><code>{}</code>\
+                 <br><br>This usually means the Obsidian bundle or the ignis template assets aren't in place.",
+                escape_html(&msg)
+            ),
+        ),
     }
 }
 

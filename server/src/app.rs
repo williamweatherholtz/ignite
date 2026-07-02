@@ -514,6 +514,38 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn index_shows_no_vaults_page_when_registry_empty() {
+        // A vault-root with no vault subdirectories -> a clear message, not a blank 500.
+        let dir = tempdir().unwrap();
+        let base = dir.path();
+        let vroot = base.join("empty-vaults");
+        fs::create_dir_all(&vroot).unwrap();
+        let reg = Arc::new(VaultRegistry::discover(&vroot));
+        // assets intentionally absent: the no-vaults branch returns before build_shell.
+        let cfg = crate::static_routes::StaticConfig {
+            assets_dir: base.join("assets"),
+            ui_dist: base.join("ui"),
+            shim_dist: base.join("shim"),
+            obsidian_assets: base.join("obsidian"),
+            obsidian_version: None,
+            ignis_version: "0.1.0".to_string(),
+        };
+        let resp = app_with_static(reg, cfg)
+            .oneshot(Request::builder().uri("/").body(Body::empty()).unwrap())
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+        let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let html = String::from_utf8(bytes.to_vec()).unwrap();
+        assert!(
+            html.contains("No vaults found"),
+            "expected the no-vaults diagnostic page"
+        );
+    }
+
+    #[tokio::test]
     async fn serves_static_asset_and_404_missing() {
         let (_d, reg, cfg) = static_fixture();
         let r = app_with_static(Arc::clone(&reg), cfg.clone())
