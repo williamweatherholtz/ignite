@@ -12,3 +12,4 @@ task: storyVaultCrud | server/src/vault_routes.rs server/src/registry.rs server/
 task: storyProxy | server/src/proxy_routes.rs server/src/app.rs server/src/lib.rs server/Cargo.toml
 task: storySettings | server/src/settings_routes.rs server/src/app.rs server/src/lib.rs
 task: storyDownload | server/src/fs_routes.rs server/src/app.rs server/Cargo.toml
+task: storyHeadlessSync | server/src/headless_sync.rs server/src/plugins.rs server/src/ws.rs server/src/app.rs server/src/lib.rs
