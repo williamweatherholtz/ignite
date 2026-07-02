@@ -31,5 +31,8 @@ package IgniteBacklog {
 
         action fsSpawnBlocking;
         verification fsSpawnBlockingDoD : Test { :>> id = "b18f52ce-9f5a-4756-a5d6-d76e6753eb57"; :>> method = VerificationMethod::test; :>> procedureText = "Resolves issue008. Move the fs CRUD handlers' blocking std::fs calls onto tokio::task::spawn_blocking (or tokio::fs) so heavy concurrent I/O cannot stall tokio worker threads. VERIFY: handlers behave identically (all fs tests stay green); clippy + cargo test + keel green."; }
+
+        action proxyDnsRebindHarden;
+        verification proxyDnsRebindHardenDoD : Test { :>> id = "e4520f2f-5adb-4bfa-ba45-2cb98e888f02"; :>> method = VerificationMethod::test; :>> procedureText = "Resolves issue009. Close the proxy DNS-rebinding TOCTOU: pin the SSRF-vetted IP into the actual connection (custom reqwest resolver / connect to the checked socket addr) or re-validate the peer address after connect, so a DNS flip between check and connect cannot reach a private address. VERIFY: a rebinding-style test (vetted host resolves public at check, private at connect) is blocked; clippy + cargo test + keel green."; }
     }
 }

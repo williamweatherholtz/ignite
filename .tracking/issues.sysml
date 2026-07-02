@@ -94,8 +94,20 @@ package IgniteIssues {
         :>> severity = Severity::Low;
     }
 
+    part issue009 : Issue {
+        :>> id = "575fe5b0-862a-45d6-b54b-1ee260f92191";
+        :>> title = "Proxy DNS-rebinding TOCTOU: SSRF guard resolves the host, but reqwest re-resolves at connect time";
+        :>> createdAt = "2026-07-02";
+        :>> createdBy = "ai";
+        :>> description = "Sprint 11 caveat: /api/proxy's addr_ok resolves the target host and checks it against the SSRF private-range guard, but reqwest independently re-resolves at connect time - a DNS entry that flips between the check and the connect (rebinding) could reach a private address. This MATCHES Ignis's model (same gap), so it's parity not a regression, but it's a genuine SSRF hardening opportunity. Fix: pin the checked IP into the connection (custom resolver / connect to the vetted socket addr), or re-validate the peer address post-connect.";
+        :>> discoveredInField = false;
+        :>> relatedTask = "proxyDnsRebindHarden";
+        :>> severity = Severity::Low;
+    }
+
     // ---- triage: each Issue is resolved by its IgniteBacklog action (computed when done) ----
     #Resolves dependency from realVaultBench to issue001;
+    #Resolves dependency from proxyDnsRebindHarden to issue009;
     #Resolves dependency from fsSpawnBlocking to issue008;
     #Resolves dependency from watcherAutoRestart to issue006;
     #Resolves dependency from bulkMoveSubtreeWalk to issue007;

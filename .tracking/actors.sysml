@@ -5,4 +5,5 @@ package ProjectActors {
 
     part will : Person { :>> name = "William Weatherholtz"; :>> email = "0612@asirobots.com"; }
     part ai : Actor { :>> name = "Claude (AI assistant)"; :>> kind = ActorKind::ai; }
+    part claudeOpus : Actor { :>> name = "Claude Opus 4.8"; :>> kind = ActorKind::ai; }
 }
