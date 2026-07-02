@@ -23,6 +23,7 @@ package IgniteDeliveryS11 {
         part storyProxyDoDR2 : TestResult { :>> id = "a9e4c844-85b2-47cd-b27b-dce9113b8498"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "4a31e34"; :>> judgedAt = "2026-07-02"; :>> judgedBy = "claudeOpus"; }
         part storyProxyDoDR3 : TestResult { :>> id = "128755a3-1204-4f35-9848-5e2cf87773b4"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "6e90b2a"; :>> judgedAt = "2026-07-02"; :>> judgedBy = "claudeOpus"; }
         part storyProxyDoDR4 : TestResult { :>> id = "516b8b96-2a31-4627-a782-e9c59eaebcd9"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "ceca03b"; :>> judgedAt = "2026-07-02"; :>> judgedBy = "claudeOpus"; }
+        part storyProxyDoDR5 : TestResult { :>> id = "bc19f773-4ad0-4b05-be3a-845b983bd23e"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "da685ef"; :>> judgedAt = "2026-07-02"; :>> judgedBy = "claudeOpus"; }
     }
 
     verification proxyRefineGate : Test { :>> id = "e4f3138a-1740-4c61-9075-b5210b758fda"; :>> title = "Sprint 11 refine gate (DoR)"; :>> createdAt = "2026-07-02"; :>> createdBy = "ai"; :>> method = VerificationMethod::inspect; :>> procedureText = "DoR: the proxy, per dProxyWireCompat (base64-JSON wire kept for shim compat; memory bounded internally). SSRF logic + shapes from proxy.js. INVEST: Independent (self-contained route + reqwest); Valuable (plugin cross-origin fetch); Estimable (5pts - route + SSRF guard + redirect re-checks + streamed encode); Small; Testable (local mock server). DoR met."; }
