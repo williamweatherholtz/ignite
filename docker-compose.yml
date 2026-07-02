@@ -1,0 +1,25 @@
+# Ignite — self-hosted Obsidian-in-the-browser (Rust drop-in for the Ignis server).
+# Primary deployment (dDeploymentDirection). Bind-mount your vaults dir at /vaults.
+services:
+  ignite:
+    build: .
+    image: ignite:dev
+    ports:
+      - "8080:8080"
+    volumes:
+      # host vaults dir -> /vaults (each immediate subdirectory is a vault)
+      - ${VAULTS_DIR:-./vaults}:/vaults
+      # persist obsidian-app + data across restarts so Obsidian isn't re-downloaded
+      - ignite-obsidian:/app/obsidian-app
+      - ignite-data:/app/data
+    environment:
+      - OBSIDIAN_VERSION=1.12.7
+      - PORT=8080
+      # - PUID=1000
+      # - PGID=1000
+      # - PROXY_MODE=any
+    restart: unless-stopped
+
+volumes:
+  ignite-obsidian:
+  ignite-data:

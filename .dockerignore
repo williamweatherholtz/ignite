@@ -1,0 +1,8 @@
+.git
+.githooks
+.tracking
+.engine
+docs
+server/target
+**/*.log
+keel.exe
