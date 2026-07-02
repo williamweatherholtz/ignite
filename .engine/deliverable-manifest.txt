@@ -10,3 +10,4 @@ task: storyBootstrapVault | server/src/vault_routes.rs server/src/app.rs server/
 task: storyStaticServing | server/src/static_routes.rs server/src/app.rs server/src/lib.rs server/Cargo.toml
 task: storyVaultCrud | server/src/vault_routes.rs server/src/registry.rs server/Cargo.toml
 task: storyProxy | server/src/proxy_routes.rs server/src/app.rs server/src/lib.rs server/Cargo.toml
+task: storySettings | server/src/settings_routes.rs server/src/app.rs server/src/lib.rs

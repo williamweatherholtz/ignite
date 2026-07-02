@@ -105,8 +105,20 @@ package IgniteIssues {
         :>> severity = Severity::Low;
     }
 
+    part issue010 : Issue {
+        :>> id = "6fbf5ac0-ccdf-4eb1-9576-ab9c6fa129f5";
+        :>> title = "POST /api/settings does not drive the proxy at runtime (proxy reads env at startup)";
+        :>> createdAt = "2026-07-02";
+        :>> createdBy = "ai";
+        :>> description = "Sprint 12 caveat: /api/settings persists proxyMode/proxyAllowlist/proxyAllowPrivate etc., but the proxy's ProxyConfig is loaded from env at startup and is not refreshed when settings change - so changing proxy mode via the API requires a server restart. Ignis applied such changes at runtime. Low impact for single-user self-host (restart acceptable). Fix: share the settings state with the proxy handler (read proxyMode/allowlist from the injected SettingsState instead of a startup-only ProxyConfig).";
+        :>> discoveredInField = false;
+        :>> relatedTask = "settingsProxyWire";
+        :>> severity = Severity::Low;
+    }
+
     // ---- triage: each Issue is resolved by its IgniteBacklog action (computed when done) ----
     #Resolves dependency from realVaultBench to issue001;
+    #Resolves dependency from settingsProxyWire to issue010;
     #Resolves dependency from proxyDnsRebindHarden to issue009;
     #Resolves dependency from fsSpawnBlocking to issue008;
     #Resolves dependency from watcherAutoRestart to issue006;

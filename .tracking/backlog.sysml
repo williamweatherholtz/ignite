@@ -34,5 +34,8 @@ package IgniteBacklog {
 
         action proxyDnsRebindHarden;
         verification proxyDnsRebindHardenDoD : Test { :>> id = "e4520f2f-5adb-4bfa-ba45-2cb98e888f02"; :>> method = VerificationMethod::test; :>> procedureText = "Resolves issue009. Close the proxy DNS-rebinding TOCTOU: pin the SSRF-vetted IP into the actual connection (custom reqwest resolver / connect to the checked socket addr) or re-validate the peer address after connect, so a DNS flip between check and connect cannot reach a private address. VERIFY: a rebinding-style test (vetted host resolves public at check, private at connect) is blocked; clippy + cargo test + keel green."; }
+
+        action settingsProxyWire;
+        verification settingsProxyWireDoD : Test { :>> id = "3d957b2e-f2ff-4cd3-9849-8e12134910ed"; :>> method = VerificationMethod::test; :>> procedureText = "Resolves issue010. Make the proxy read proxyMode/proxyAllowlist/proxyAllowPrivate from the shared injected SettingsState (not a startup-only ProxyConfig), so POST /api/settings takes effect at runtime without a restart. VERIFY: POST /api/settings {proxyMode:disabled} then a proxy request is rejected without restart; clippy + cargo test + keel green."; }
     }
 }
