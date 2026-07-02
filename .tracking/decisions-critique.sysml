@@ -37,7 +37,23 @@ package IgniteCritiqueDecisions {
     verification dCritiqueEfficiencyAccept : Test { :>> id = "ef053400-8206-4398-b9a9-3bd99742cb2e"; :>> method = VerificationMethod::confirmation; :>> procedureText = "will selected 'Efficiency (#4 proxy streaming, #5 WS batching, parallel startup)' on the critique-adoption question, 2026-06-30."; }
     part dCritiqueEfficiencyAcceptR1 : TestResult { :>> id = "16104096-0f74-46c6-bfd0-6634dab88b74"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "a5a0f41"; :>> judgedAt = "2026-06-30"; :>> judgedBy = "will"; }
 
-    // traceability: correctness invariants serve reliable live sync; efficiency serves responsiveness
+    part dProxyWireCompat : Decision {
+        :>> id = "9bbec008-695f-4b20-bcc2-0ae77e9659f5";
+        :>> title = "Amend dCritiqueEfficiency #4: the proxy keeps Ignis's base64-JSON wire (shim compat); bound memory internally instead";
+        :>> createdAt = "2026-07-02";
+        :>> createdBy = "will";
+        :>> status = DecisionStatus::accepted;
+        :>> context = "dCritiqueEfficiency #4 (adopted from the critique) said the proxy should 'stream the upstream response as binary pass-through instead of base64-in-JSON'. Planning sprint11 revealed this CONFLICTS with the drop-in contract: Ignis's /api/proxy returns {status,headers,body:base64} and the UNCHANGED browser shim (dScope) decodes that envelope. A binary wire would break the shim. The #4 proxy sub-point was proposed without accounting for the shim's dependence on the envelope.";
+        :>> decision = "AMEND dCritiqueEfficiency #4 (proxy only): Ignite's /api/proxy KEEPS Ignis's base64-in-JSON wire ({status,headers,body:base64}) for shim compatibility, and instead bounds server memory internally - stream the upstream fetch + encode incrementally (avoid holding a raw+base64 duplicate), keep the 50MB cap + the SSRF/private-IP guard + redirect re-checks. dCritiqueEfficiency #5 (WS serialize-once/backpressure/batch) is UNAFFECTED and stands; only #4's 'no base64' clause is retired.";
+        :>> rationale = "The drop-in's premise is an unchanged shim (dScope); wire-compat wins over the internal-representation change. ALTERNATIVES: (A) binary pass-through per literal #4 - rejected (breaks the shim; needs shim changes; violates dScope); (B) defer the proxy - rejected (plugins need cross-origin fetch); (C) keep the base64 wire + bound memory - CHOSEN. CRITERIA: preserve the drop-in contract x still address #4's memory concern as far as compat allows.";
+        :>> consequences = "sprint11 builds /api/proxy to Ignis's base64-JSON wire with a bounded/streamed encode + SSRF guard + 50MB cap. #4's 'no base64' clause is retired; its memory-bounding intent is preserved. #5 (WS) unchanged. Corrects an over-reach in the original critique adoption.";
+    }
+    verification dProxyWireCompatAccept : Test { :>> id = "a7b970d0-2501-4aef-ac92-1e4b3e3a70af"; :>> method = VerificationMethod::confirmation; :>> procedureText = "will chose 'Amend #4: keep base64-JSON wire, bound memory internally' on the proxy-wire question, 2026-07-02, on being shown the dCritiqueEfficiency-#4-vs-drop-in-shim conflict."; }
+    part dProxyWireCompatAcceptR1 : TestResult { :>> id = "d0467409-9717-4b93-92ed-02e83bdd5b05"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "101aff9"; :>> judgedAt = "2026-07-02"; :>> judgedBy = "will"; }
+
+    // traceability: correctness invariants serve reliable live sync; efficiency serves responsiveness;
+    // the proxy-wire amendment serves the drop-in wire contract.
     #DependsOn dependency from dCritiqueCorrectness to needReliableLiveSync;
     #DependsOn dependency from dCritiqueEfficiency to needResponsiveUnderLoad;
+    #DependsOn dependency from dProxyWireCompat to srWireCompat;
 }
