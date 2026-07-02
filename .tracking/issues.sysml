@@ -116,8 +116,32 @@ package IgniteIssues {
         :>> severity = Severity::Low;
     }
 
+    part issue011 : Issue {
+        :>> id = "d291ec3d-cd44-45b0-8201-bb66d1914a3a";
+        :>> title = "download-zip buffers the whole archive in memory instead of streaming";
+        :>> createdAt = "2026-07-02";
+        :>> createdBy = "ai";
+        :>> description = "Sprint 13 caveat: /api/fs/download-zip builds the zip fully in a Vec<u8> before responding, vs Ignis's archive.pipe(res) streaming. Fine for typical folders; a very large folder zips into RAM. Refinement: stream the zip to the response body (async zip writer / channel). Low (akin to issue008's blocking-fs concern).";
+        :>> discoveredInField = false;
+        :>> relatedTask = "zipStreaming";
+        :>> severity = Severity::Low;
+    }
+
+    part issue012 : Issue {
+        :>> id = "86ecc06b-ba88-4254-81d5-73c51afaf5e6";
+        :>> title = "Content-Disposition is ASCII filename= only; no RFC-5987 filename* for non-ASCII names";
+        :>> createdAt = "2026-07-02";
+        :>> createdBy = "ai";
+        :>> description = "Sprint 13 caveat: download/download-zip set a basic ASCII Content-Disposition filename=\"..\"; Ignis's encodeContentDispositionFilename adds an RFC-5987 filename* for non-ASCII names. A vault file/folder with non-ASCII characters downloads with a degraded (not broken) filename. Low wire-parity gap. Fix: add the filename* encoding.";
+        :>> discoveredInField = false;
+        :>> relatedTask = "contentDispositionRfc5987";
+        :>> severity = Severity::Low;
+    }
+
     // ---- triage: each Issue is resolved by its IgniteBacklog action (computed when done) ----
     #Resolves dependency from realVaultBench to issue001;
+    #Resolves dependency from zipStreaming to issue011;
+    #Resolves dependency from contentDispositionRfc5987 to issue012;
     #Resolves dependency from settingsProxyWire to issue010;
     #Resolves dependency from proxyDnsRebindHarden to issue009;
     #Resolves dependency from fsSpawnBlocking to issue008;

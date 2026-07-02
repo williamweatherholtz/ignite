@@ -37,5 +37,11 @@ package IgniteBacklog {
 
         action settingsProxyWire;
         verification settingsProxyWireDoD : Test { :>> id = "3d957b2e-f2ff-4cd3-9849-8e12134910ed"; :>> method = VerificationMethod::test; :>> procedureText = "Resolves issue010. Make the proxy read proxyMode/proxyAllowlist/proxyAllowPrivate from the shared injected SettingsState (not a startup-only ProxyConfig), so POST /api/settings takes effect at runtime without a restart. VERIFY: POST /api/settings {proxyMode:disabled} then a proxy request is rejected without restart; clippy + cargo test + keel green."; }
+
+        action zipStreaming;
+        verification zipStreamingDoD : Test { :>> id = "a94a65cd-082b-44ed-88b3-9fbbf855fd5c"; :>> method = VerificationMethod::test; :>> procedureText = "Resolves issue011. Stream download-zip to the response body (async zip writer / channel-backed body) instead of buffering the whole archive in a Vec<u8>, so a large folder does not zip into RAM. VERIFY: a large-folder zip streams (bounded memory); entries still correct; clippy + cargo test + keel green."; }
+
+        action contentDispositionRfc5987;
+        verification contentDispositionRfc5987DoD : Test { :>> id = "a6d0d306-700c-4bcb-b1c9-f0aaa17da3ff"; :>> method = VerificationMethod::test; :>> procedureText = "Resolves issue012. Add RFC-5987 filename* encoding to Content-Disposition (download + download-zip) for non-ASCII names, matching Ignis's encodeContentDispositionFilename. VERIFY: a non-ASCII filename yields both filename= (ASCII fallback) and filename*=UTF-8''..; clippy + cargo test + keel green."; }
     }
 }
