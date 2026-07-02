@@ -3,7 +3,9 @@
 
 pub mod app;
 pub mod fs_routes;
+pub mod headless_sync;
 pub mod index;
+pub mod plugins;
 pub mod proxy_routes;
 pub mod registry;
 pub mod settings_routes;

@@ -3,9 +3,10 @@
 //! #5: each event is serialized ONCE by the watcher (see `index::apply_paths`) and broadcast;
 //! this handler honors backpressure (a lagging client recovers, never buffers unboundedly).
 
+use crate::plugins::{ChannelHub, ChannelMsg};
 use crate::registry::VaultRegistry;
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
-use axum::extract::{Query, State};
+use axum::extract::{Extension, Query, State};
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use futures_util::{SinkExt, StreamExt};
@@ -29,6 +30,7 @@ pub async fn ws_handler(
     ws: WebSocketUpgrade,
     Query(q): Query<WsQuery>,
     State(reg): State<Arc<VaultRegistry>>,
+    Extension(hub): Extension<ChannelHub>,
 ) -> Response {
     let Some(vault) = q.vault else {
         return StatusCode::BAD_REQUEST.into_response();
@@ -37,10 +39,16 @@ pub async fn ws_handler(
         return StatusCode::NOT_FOUND.into_response();
     };
     let rx = index.subscribe();
-    ws.on_upgrade(move |socket| serve_socket(socket, rx))
+    let chan_rx = hub.subscribe();
+    ws.on_upgrade(move |socket| serve_socket(socket, rx, chan_rx, vault))
 }
 
-async fn serve_socket(socket: WebSocket, mut rx: Receiver<String>) {
+async fn serve_socket(
+    socket: WebSocket,
+    mut rx: Receiver<String>,
+    mut chan_rx: Receiver<ChannelMsg>,
+    vault: String,
+) {
     let (mut tx, mut incoming) = socket.split();
     let mut heartbeat = tokio::time::interval(HEARTBEAT);
     heartbeat.tick().await; // consume the immediate first tick (don't ping instantly)
@@ -57,6 +65,18 @@ async fn serve_socket(socket: WebSocket, mut rx: Receiver<String>) {
                 }
                 Err(RecvError::Lagged(_)) => continue, // dropped oldest; stay connected
                 Err(RecvError::Closed) => break,
+            },
+            // a plugin channel broadcast -> client, if subscribed to that channel + this vault
+            cmsg = chan_rx.recv() => match cmsg {
+                Ok(m) => {
+                    if m.vault == vault && channels.contains(&m.channel)
+                        && tx.send(Message::Text(m.json.into())).await.is_err()
+                    {
+                        break;
+                    }
+                }
+                Err(RecvError::Lagged(_)) => continue,
+                Err(RecvError::Closed) => {} // hub gone; keep serving file events
             },
             // client -> server control messages
             msg = incoming.next() => match msg {
@@ -75,11 +95,8 @@ async fn serve_socket(socket: WebSocket, mut rx: Receiver<String>) {
     }
 }
 
-/// Track channel subscriptions (`subscribe-channel` / `unsubscribe-channel`). Plugin
-/// channels don't route anywhere yet (that's a later sprint), so we accept + track per
-/// connection without error; unknown messages are ignored. The set is read once plugin
-/// channel routing lands.
-#[allow(clippy::collection_is_never_read)]
+/// Track channel subscriptions (`subscribe-channel` / `unsubscribe-channel`). The set is
+/// read in the channel-broadcast select branch to decide which plugin messages to forward.
 fn handle_control(text: &str, channels: &mut HashSet<String>) {
     let Ok(v) = serde_json::from_str::<serde_json::Value>(text) else {
         return;

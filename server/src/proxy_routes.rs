@@ -77,7 +77,11 @@ impl ProxyConfig {
 
     /// Parse a comma-separated allow list of exact IPs and IPv4 CIDRs (matches Ignis buildAllowList).
     pub fn set_allow_private(&mut self, entries: &str) {
-        for entry in entries.split(',').map(|s| s.trim()).filter(|s| !s.is_empty()) {
+        for entry in entries
+            .split(',')
+            .map(|s| s.trim())
+            .filter(|s| !s.is_empty())
+        {
             if let Some((base, prefix)) = entry.split_once('/') {
                 if let (Ok(std::net::Ipv4Addr { .. }), Ok(p)) =
                     (base.parse::<std::net::Ipv4Addr>(), prefix.parse::<u32>())
@@ -364,7 +368,14 @@ mod tests {
 
     #[test]
     fn private_ip_classification_matches_ignis() {
-        for s in ["10.0.0.1", "127.0.0.1", "192.168.1.1", "169.254.1.1", "172.16.0.1", "::1"] {
+        for s in [
+            "10.0.0.1",
+            "127.0.0.1",
+            "192.168.1.1",
+            "169.254.1.1",
+            "172.16.0.1",
+            "::1",
+        ] {
             assert!(is_private_ip(s.parse().unwrap()), "{s} should be private");
         }
         for s in ["8.8.8.8", "1.1.1.1", "203.0.113.5"] {
@@ -414,7 +425,9 @@ mod tests {
             .await
             .unwrap();
         let status = resp.status();
-        let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+        let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
         let v: Value = serde_json::from_slice(&bytes).unwrap_or(Value::Null);
         (status, v)
     }
@@ -428,7 +441,9 @@ mod tests {
         assert_eq!(status, 200);
         assert_eq!(v["status"], 200);
         let b64 = v["body"].as_str().unwrap();
-        let decoded = base64::engine::general_purpose::STANDARD.decode(b64).unwrap();
+        let decoded = base64::engine::general_purpose::STANDARD
+            .decode(b64)
+            .unwrap();
         assert_eq!(decoded, b"hello-upstream");
         assert_eq!(v["headers"]["x-test"], "yes");
     }

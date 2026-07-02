@@ -44,6 +44,19 @@ pub fn app_with_static(reg: Arc<VaultRegistry>, cfg: crate::static_routes::Stati
         .fallback(ServeDir::new(&cfg.shim_dist).fallback(ServeDir::new(&cfg.obsidian_assets)));
     let assets = ServeDir::new(&cfg.assets_dir);
 
+    // Plugin seam (dPlugins): the WS channel hub + the native headless-sync plugin.
+    let hub = crate::plugins::ChannelHub::new();
+    let data_root = std::env::var("DATA_ROOT").unwrap_or_else(|_| "./data".to_string());
+    let hs = crate::headless_sync::HeadlessSync::new(
+        std::path::PathBuf::from(&data_root)
+            .join("plugins")
+            .join("headless-sync"),
+        Arc::new(crate::headless_sync::RealCli),
+        hub.clone(),
+        reg.clone(),
+    );
+    let plugin_descriptors = Arc::new(vec![crate::plugins::ServerPlugin::descriptor(&*hs)]);
+
     Router::new()
         .route("/api/fs/tree", get(fs_tree))
         .route("/ws", get(crate::ws::ws_handler))
@@ -54,6 +67,7 @@ pub fn app_with_static(reg: Arc<VaultRegistry>, cfg: crate::static_routes::Stati
         .merge(crate::vault_routes::routes())
         .merge(crate::proxy_routes::routes())
         .merge(crate::settings_routes::routes())
+        .merge(crate::headless_sync::routes())
         .nest_service("/assets", assets)
         .fallback_service(statics)
         .layer(axum::middleware::from_fn(st::cache_control_mw))
@@ -64,6 +78,9 @@ pub fn app_with_static(reg: Arc<VaultRegistry>, cfg: crate::static_routes::Stati
         .layer(axum::Extension(
             crate::settings_routes::SettingsState::from_env(),
         ))
+        .layer(axum::Extension(hs))
+        .layer(axum::Extension(plugin_descriptors))
+        .layer(axum::Extension(hub))
         .layer(tower_http::compression::CompressionLayer::new())
         .with_state(reg)
 }

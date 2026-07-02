@@ -11,6 +11,7 @@ use axum::{
     Extension, Router,
 };
 use serde::{Deserialize, Serialize};
+use crate::plugins::PluginDescriptor;
 use serde_json::{json, Value};
 use std::path::PathBuf;
 use std::sync::{Arc, RwLock};
@@ -227,9 +228,27 @@ async fn get_version() -> Json<Value> {
     Json(json!({ "version": version, "build": build, "obsidianVersion": obsidian_version }))
 }
 
-async fn get_plugins() -> Json<Value> {
-    // No server plugins are loaded yet — native headless-sync is a later sprint (dPlugins).
-    Json(json!([]))
+async fn get_plugins(plugins: Option<Extension<Arc<Vec<PluginDescriptor>>>>) -> Json<Value> {
+    // Lists the registered ServerPlugins (injected by app.rs); empty if none are registered
+    // (e.g. settings_routes' own tests build the router without the plugin layer).
+    let Some(Extension(list)) = plugins else {
+        return Json(json!([]));
+    };
+    let arr: Vec<Value> = list
+        .iter()
+        .map(|p| {
+            json!({
+                "id": p.id,
+                "name": p.name,
+                "description": p.description,
+                "hasBundledPlugin": false,
+                "bundledPluginId": Value::Null,
+                "enabledVaults": [],
+                "loaded": true,
+            })
+        })
+        .collect();
+    Json(Value::Array(arr))
 }
 
 /// Both enable/disable behave the same here: require a vault, then fail because no server
