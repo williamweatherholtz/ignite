@@ -138,8 +138,20 @@ package IgniteIssues {
         :>> severity = Severity::Low;
     }
 
+    part issue013 : Issue {
+        :>> id = "2abd03ce-b9bd-456f-9f2f-35cf80489659";
+        :>> title = "End-to-end unverified: a browser actually loading + operating Obsidian against the Ignite container";
+        :>> createdAt = "2026-07-02";
+        :>> createdBy = "ai";
+        :>> description = "sprint15 verified the SERVER runs in the Docker container (endpoints return correct Ignis-shaped JSON) but NOT that a browser loads + operates Obsidian against it - that is a human demo (D0049, method=demo) the AI cannot self-attest. Risk: Ignite's static/app-shell serving (sprint09) was built against fixtures, so the real Ignis template placeholders, ignis-ui.js/shim-loader.js serving paths, app.css source, and route ordering may need a tweak once tested in a real browser. RESOLVER: run `docker compose up` (or the stack), open the browser, confirm Obsidian loads + a vault opens + edits live-sync; fix any asset-wiring mismatch surfaced.";
+        :>> discoveredInField = false;
+        :>> relatedTask = "browserLoadDemo";
+        :>> severity = Severity::Medium;
+    }
+
     // ---- triage: each Issue is resolved by its IgniteBacklog action (computed when done) ----
     #Resolves dependency from realVaultBench to issue001;
+    #Resolves dependency from browserLoadDemo to issue013;
     #Resolves dependency from zipStreaming to issue011;
     #Resolves dependency from contentDispositionRfc5987 to issue012;
     #Resolves dependency from settingsProxyWire to issue010;

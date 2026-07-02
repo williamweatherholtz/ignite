@@ -43,5 +43,8 @@ package IgniteBacklog {
 
         action contentDispositionRfc5987;
         verification contentDispositionRfc5987DoD : Test { :>> id = "a6d0d306-700c-4bcb-b1c9-f0aaa17da3ff"; :>> method = VerificationMethod::test; :>> procedureText = "Resolves issue012. Add RFC-5987 filename* encoding to Content-Disposition (download + download-zip) for non-ASCII names, matching Ignis's encodeContentDispositionFilename. VERIFY: a non-ASCII filename yields both filename= (ASCII fallback) and filename*=UTF-8''..; clippy + cargo test + keel green."; }
+
+        action browserLoadDemo;
+        verification browserLoadDemoDoD : Test { :>> id = "bec5bff5-882a-4a51-9f6a-e08368d16fa3"; :>> method = VerificationMethod::demo; :>> procedureText = "Resolves issue013 (HUMAN demo, D0049). Run the Ignite container (docker compose up, or the Caddy stack) with a real vault bind-mounted, open a browser, and confirm: Obsidian loads (the shell + shim), a vault opens, files render, and an edit live-syncs. Fix any Ignis-asset-wiring mismatch (template placeholders / ui-shim serving paths / app.css / route order) surfaced. Human-attested."; }
     }
 }
