@@ -1,24 +1,28 @@
 //! Vault discovery + the per-vault warm index registry.
+//!
+//! Runtime-mutable (sprint 10): vaults live behind an `RwLock` so create/remove can
+//! add/drop entries while the app holds `Arc<VaultRegistry>`. `get` returns an `Arc`
+//! snapshot (cheap clone under a read lock). Dropping an entry releases its
+//! `Arc<VaultIndex>`; the notify watcher stops when the last `Arc` is gone.
 
 use crate::index::VaultIndex;
 use rayon::prelude::*;
 use std::collections::HashMap;
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use std::sync::{Arc, RwLock};
 
-/// Holds a warm [`VaultIndex`] for every discovered vault, keyed by vault name.
+/// Holds a warm [`VaultIndex`] for every known vault, keyed by vault name.
 #[derive(Debug, Default)]
 pub struct VaultRegistry {
-    vaults: HashMap<String, VaultIndex>,
+    vaults: RwLock<HashMap<String, Arc<VaultIndex>>>,
+    vault_root: PathBuf,
 }
 
 impl VaultRegistry {
-    /// Discover vaults as the immediate subdirectories of `vault_root` and build
-    /// a warm index for each. Non-directory entries are ignored. Indexes are built
-    /// in PARALLEL across vaults (dCritiqueEfficiency): startup is bounded by the
-    /// slowest single vault, not the sum — material for multi-vault setups on slow
-    /// storage (e.g. ~6 vaults over a Docker bind mount).
+    /// Discover vaults as the immediate subdirectories of `vault_root` and build a warm
+    /// live index for each, in PARALLEL across vaults (dCritiqueEfficiency).
     pub fn discover(vault_root: &Path) -> Self {
-        let dirs: Vec<(String, std::path::PathBuf)> = match std::fs::read_dir(vault_root) {
+        let dirs: Vec<(String, PathBuf)> = match std::fs::read_dir(vault_root) {
             Ok(entries) => entries
                 .flatten()
                 .filter(|e| e.file_type().map(|t| t.is_dir()).unwrap_or(false))
@@ -26,23 +30,48 @@ impl VaultRegistry {
                 .collect(),
             Err(_) => Vec::new(),
         };
-        let vaults: HashMap<String, VaultIndex> = dirs
+        let vaults: HashMap<String, Arc<VaultIndex>> = dirs
             .into_par_iter()
-            .map(|(name, path)| (name, VaultIndex::build_live(&path)))
+            .map(|(name, path)| (name, Arc::new(VaultIndex::build_live(&path))))
             .collect();
-        Self { vaults }
+        Self {
+            vaults: RwLock::new(vaults),
+            vault_root: vault_root.to_path_buf(),
+        }
     }
 
-    /// The warm index for `name`, or `None` if there is no such vault.
-    pub fn get(&self, name: &str) -> Option<&VaultIndex> {
-        self.vaults.get(name)
+    /// The warm index for `name` (an `Arc` snapshot), or `None` if there is no such vault.
+    pub fn get(&self, name: &str) -> Option<Arc<VaultIndex>> {
+        self.vaults.read().unwrap().get(name).cloned()
+    }
+
+    /// Whether a vault named `name` currently exists.
+    pub fn contains(&self, name: &str) -> bool {
+        self.vaults.read().unwrap().contains_key(name)
     }
 
     /// All known vault names (sorted).
     pub fn names(&self) -> Vec<String> {
-        let mut names: Vec<String> = self.vaults.keys().cloned().collect();
+        let mut names: Vec<String> = self.vaults.read().unwrap().keys().cloned().collect();
         names.sort();
         names
+    }
+
+    /// The vault root directory (parent of all vault dirs) — used by create/rename.
+    pub fn vault_root(&self) -> &Path {
+        &self.vault_root
+    }
+
+    /// Build a live index for the vault at `path` and register it under `name`.
+    pub fn insert_vault(&self, name: String, path: &Path) {
+        let idx = Arc::new(VaultIndex::build_live(path));
+        self.vaults.write().unwrap().insert(name, idx);
+    }
+
+    /// Drop the vault's index (its watcher stops once the last `Arc` is released).
+    /// Returns whether an entry was present.
+    pub fn remove_vault(&self, name: &str) -> bool {
+        self.vaults.write().unwrap().remove(name).is_some()
     }
 }
 
@@ -75,5 +104,22 @@ mod tests {
 
         // the discovered index is warm and has the vault's file
         assert!(reg.get("Games").unwrap().tree().contains_key("a.md"));
+    }
+
+    #[test]
+    fn insert_and_remove_mutate_the_registry() {
+        let dir = tempdir().unwrap();
+        let vroot = dir.path();
+        let reg = VaultRegistry::discover(vroot);
+        assert!(reg.names().is_empty());
+
+        fs::create_dir(vroot.join("New")).unwrap();
+        reg.insert_vault("New".to_string(), &vroot.join("New"));
+        assert!(reg.get("New").is_some());
+        assert_eq!(reg.names(), vec!["New".to_string()]);
+
+        assert!(reg.remove_vault("New"));
+        assert!(reg.get("New").is_none());
+        assert!(!reg.remove_vault("New"), "second remove is a no-op");
     }
 }
