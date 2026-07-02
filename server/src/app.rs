@@ -53,6 +53,7 @@ pub fn app_with_static(reg: Arc<VaultRegistry>, cfg: crate::static_routes::Stati
         .merge(crate::fs_routes::routes())
         .merge(crate::vault_routes::routes())
         .merge(crate::proxy_routes::routes())
+        .merge(crate::settings_routes::routes())
         .nest_service("/assets", assets)
         .fallback_service(statics)
         .layer(axum::middleware::from_fn(st::cache_control_mw))
@@ -60,6 +61,9 @@ pub fn app_with_static(reg: Arc<VaultRegistry>, cfg: crate::static_routes::Stati
         .layer(axum::Extension(Arc::new(
             crate::proxy_routes::ProxyConfig::from_env(),
         )))
+        .layer(axum::Extension(
+            crate::settings_routes::SettingsState::from_env(),
+        ))
         .layer(tower_http::compression::CompressionLayer::new())
         .with_state(reg)
 }

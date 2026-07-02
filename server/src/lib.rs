@@ -6,6 +6,7 @@ pub mod fs_routes;
 pub mod index;
 pub mod proxy_routes;
 pub mod registry;
+pub mod settings_routes;
 pub mod static_routes;
 pub mod vault_routes;
 pub mod ws;
