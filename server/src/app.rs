@@ -82,7 +82,23 @@ pub fn app_with_static(reg: Arc<VaultRegistry>, cfg: crate::static_routes::Stati
         .layer(axum::Extension(plugin_descriptors))
         .layer(axum::Extension(hub))
         .layer(tower_http::compression::CompressionLayer::new())
+        .layer(axum::middleware::from_fn(log_requests))
         .with_state(reg)
+}
+
+/// Per-request log line (outermost layer): method, path, final status, latency.
+/// At INFO, so `docker compose logs` shows each request like Ignis did (`GET /api/... 200 4.1ms`).
+async fn log_requests(
+    req: axum::extract::Request,
+    next: axum::middleware::Next,
+) -> axum::response::Response {
+    let method = req.method().clone();
+    let path = req.uri().path().to_owned();
+    let start = std::time::Instant::now();
+    let resp = next.run(req).await;
+    let ms = start.elapsed().as_secs_f64() * 1000.0;
+    tracing::info!(%method, path, status = resp.status().as_u16(), latency_ms = ms, "request");
+    resp
 }
 
 #[cfg(test)]

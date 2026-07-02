@@ -8,6 +8,16 @@ use std::sync::Arc;
 
 #[tokio::main]
 async fn main() {
+    // Structured, leveled logging. Level via RUST_LOG (default "info"); per-request lines come
+    // from the log_requests middleware. e.g. RUST_LOG=ignite_server=debug,tower_http=debug
+    tracing_subscriber::fmt()
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info")),
+        )
+        .with_target(false)
+        .init();
+
     let vault_root = std::env::var("VAULT_ROOT").unwrap_or_else(|_| "./vaults".to_string());
     let port: u16 = std::env::var("PORT")
         .ok()
@@ -21,16 +31,16 @@ async fn main() {
         .unwrap_or_else(|_| vault_root.clone());
     let names = registry.names();
     if names.is_empty() {
-        eprintln!(
-            "[ignite] WARNING: no vaults found under VAULT_ROOT='{vault_root}' (resolved: {resolved}). \
-             Each immediate SUBDIRECTORY of VAULT_ROOT is a vault. In Docker, check your /vaults bind \
-             mount: VAULTS_DIR must point at a directory that CONTAINS your vault folders (and be shared \
-             with Docker Desktop). The browser will show a 'no vaults' page until one is mounted."
+        tracing::warn!(
+            vault_root = %vault_root, resolved = %resolved,
+            "no vaults found. Each immediate SUBDIRECTORY of VAULT_ROOT is a vault. In Docker, \
+             check your /vaults bind mount: VAULTS_DIR must point at a directory that CONTAINS your \
+             vault folders (and be shared with Docker Desktop). The browser will show a 'no vaults' page."
         );
     } else {
-        println!(
-            "[ignite] indexed {} vault(s) from {vault_root} (resolved: {resolved}): {names:?}",
-            names.len()
+        tracing::info!(
+            count = names.len(), vault_root = %vault_root, resolved = %resolved, vaults = ?names,
+            "indexed vaults"
         );
     }
 
@@ -38,7 +48,7 @@ async fn main() {
     let listener = tokio::net::TcpListener::bind(addr)
         .await
         .unwrap_or_else(|e| panic!("cannot bind {addr}: {e}"));
-    println!("ignite-server listening on http://{addr}");
+    tracing::info!(%addr, "ignite-server listening");
     axum::serve(listener, app(registry))
         .await
         .expect("server error");

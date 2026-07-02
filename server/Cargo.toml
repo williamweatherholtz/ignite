@@ -29,6 +29,8 @@ regex = "1"
 mime_guess = "2"
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "stream", "gzip", "brotli", "deflate"] }
 zip = { version = "2", default-features = false, features = ["deflate"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 [dev-dependencies]
 tempfile = "3"

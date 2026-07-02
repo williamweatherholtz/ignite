@@ -11,18 +11,16 @@ services:
     expose:
       - "8080"            # internal only; Caddy is the public edge
     volumes:
-      # LEFT = host path (set VAULTS_DIR to the dir that CONTAINS your vault folders);
-      # RIGHT = the in-container path the server reads (always /vaults). Do NOT set VAULT_ROOT
-      # to a host/Windows path - inside the Linux container the vaults live at /vaults.
-      # Example (PowerShell):  $env:VAULTS_DIR="C:\ignite-vaults"; docker compose -f docker-compose.stack.yml up --build
-      # (a single-vault mount also works:  - C:\path\to\MyVault:/vaults/MyVault)
+      # THE ONE THING TO CONFIGURE: VAULTS_DIR = your host folder that CONTAINS your vault
+      # subfolders (set it in .env, or inline). The ":/vaults" part is fixed - don't change it.
+      #   .env:            VAULTS_DIR=C:\vaults
+      #   or inline (PS):  $env:VAULTS_DIR="C:\vaults"; docker compose -f docker-compose.stack.yml up --build
       - ${VAULTS_DIR:-./vaults}:/vaults
       - ignite-obsidian:/app/obsidian-app   # persist Obsidian so it isn't re-downloaded
       - ignite-data:/app/data
     environment:
       - OBSIDIAN_VERSION=1.12.7
       - PORT=8080
-      # VAULT_ROOT defaults to /vaults (set in the Dockerfile) - the CONTAINER path; leave it.
       # - PUID=1000
       # - PGID=1000
     restart: unless-stopped

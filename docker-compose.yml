@@ -15,8 +15,8 @@ services:
     environment:
       - OBSIDIAN_VERSION=1.12.7
       - PORT=8080
-      # VAULT_ROOT defaults to /vaults (the CONTAINER path, set in the Dockerfile) - leave it;
-      # set VAULTS_DIR (host path) above to point at the dir containing your vault folders.
+      # Set VAULTS_DIR in .env (NOT here): it's a compose interpolation variable for the volume
+      # mapping above, not a container env var. Do NOT set VAULT_ROOT (fixed container path /vaults).
       # - PUID=1000
       # - PGID=1000
       # - PROXY_MODE=any
