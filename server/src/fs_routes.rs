@@ -20,7 +20,7 @@ use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 // ---- errors (sanitized: never leak host paths or stack traces) ----
-enum ApiError {
+pub(crate) enum ApiError {
     BadRequest(&'static str),
     NotFound,
     Io(std::io::ErrorKind),
@@ -56,7 +56,7 @@ fn to_ms(t: SystemTime) -> f64 {
 /// traversal that would escape (leading-slash absolute, `..` above root, drive prefix).
 /// Purely lexical (matches Ignis's textual containment); symlink canonicalization is
 /// separately tracked.
-fn resolve_in_vault(root: &Path, rel: &str) -> Result<PathBuf, ApiError> {
+pub(crate) fn resolve_in_vault(root: &Path, rel: &str) -> Result<PathBuf, ApiError> {
     let rel = rel.trim_start_matches(['/', '\\']);
     let mut out = root.to_path_buf();
     let mut depth: i32 = 0;

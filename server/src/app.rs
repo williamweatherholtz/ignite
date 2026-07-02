@@ -28,13 +28,34 @@ async fn fs_tree(
     Ok(Json(tree_to_value(&index.tree())))
 }
 
-/// Build the application router over a discovered [`VaultRegistry`].
+/// Build the application router over a discovered [`VaultRegistry`], reading static-asset
+/// paths from the environment.
 pub fn app(reg: Arc<VaultRegistry>) -> Router {
+    app_with_static(reg, crate::static_routes::StaticConfig::from_env())
+}
+
+/// Build the router with an explicit [`StaticConfig`] (fixture paths in tests).
+pub fn app_with_static(reg: Arc<VaultRegistry>, cfg: crate::static_routes::StaticConfig) -> Router {
+    use crate::static_routes as st;
+    use tower_http::services::ServeDir;
+
+    // Ignis serves ui/dist, then shim/dist, then the Obsidian bundle — all at root.
+    let statics = ServeDir::new(&cfg.ui_dist)
+        .fallback(ServeDir::new(&cfg.shim_dist).fallback(ServeDir::new(&cfg.obsidian_assets)));
+    let assets = ServeDir::new(&cfg.assets_dir);
+
     Router::new()
         .route("/api/fs/tree", get(fs_tree))
         .route("/ws", get(crate::ws::ws_handler))
+        .route("/", get(st::index_handler))
+        .route("/index.html", get(st::index_handler))
+        .route("/vault-files/{vault}/{*path}", get(st::vault_files_handler))
         .merge(crate::fs_routes::routes())
         .merge(crate::vault_routes::routes())
+        .nest_service("/assets", assets)
+        .fallback_service(statics)
+        .layer(axum::middleware::from_fn(st::cache_control_mw))
+        .layer(axum::Extension(Arc::new(cfg)))
         .layer(tower_http::compression::CompressionLayer::new())
         .with_state(reg)
 }
@@ -391,5 +412,203 @@ mod tests {
         let (_dir, reg) = registry_with_one_vault();
         let (status, _v) = get_json(&reg, "/api/bootstrap?vault=Nope").await;
         assert_eq!(status, StatusCode::NOT_FOUND);
+    }
+
+    // ---- static + app-shell serving (sprint 9) ----
+
+    fn static_fixture() -> (
+        tempfile::TempDir,
+        Arc<VaultRegistry>,
+        crate::static_routes::StaticConfig,
+    ) {
+        let dir = tempdir().unwrap();
+        let base = dir.path();
+        let vroot = base.join("vaults");
+        fs::create_dir_all(vroot.join("Games")).unwrap();
+        fs::write(vroot.join("Games").join("a.md"), b"hello").unwrap();
+        fs::write(vroot.join("Games").join("pic.png"), b"PNGDATA").unwrap();
+        let reg = Arc::new(VaultRegistry::discover(&vroot));
+
+        let assets = base.join("assets");
+        fs::create_dir_all(&assets).unwrap();
+        fs::write(
+            assets.join("index.html"),
+            r#"<!doctype html><head><link href="__APP_CSS_SRC__"><script src="__IGNIS_UI_SRC__"></script><script src="__SHIM_LOADER_SRC__"></script><script>window.OBS=__OBSIDIAN_SCRIPTS__;</script></head><body class="theme-dark"></body>"#,
+        )
+        .unwrap();
+        fs::write(assets.join("overrides.css"), b"body{}").unwrap();
+        let obsidian = base.join("obsidian");
+        fs::create_dir_all(&obsidian).unwrap();
+        fs::write(
+            obsidian.join("index.html"),
+            r#"<html><head><script src="app.js"></script><script src="lib/x.js"></script></head></html>"#,
+        )
+        .unwrap();
+
+        let cfg = crate::static_routes::StaticConfig {
+            assets_dir: assets,
+            ui_dist: base.join("ui"),
+            shim_dist: base.join("shim"),
+            obsidian_assets: obsidian,
+            obsidian_version: Some("1.12.7".to_string()),
+            ignis_version: "0.1.0".to_string(),
+        };
+        (dir, reg, cfg)
+    }
+
+    #[tokio::test]
+    async fn serves_index_shell_with_injected_scripts() {
+        let (_d, reg, cfg) = static_fixture();
+        let resp = app_with_static(reg, cfg)
+            .oneshot(Request::builder().uri("/").body(Body::empty()).unwrap())
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+        assert_eq!(
+            resp.headers()
+                .get(axum::http::header::CACHE_CONTROL)
+                .unwrap(),
+            "no-cache"
+        );
+        assert!(resp
+            .headers()
+            .get(axum::http::header::CONTENT_TYPE)
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .starts_with("text/html"));
+        let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let html = String::from_utf8(bytes.to_vec()).unwrap();
+        assert!(html.contains("ignis-ui.js?v=0.1.0"));
+        assert!(html.contains("shim-loader.js?v=0.1.0"));
+        assert!(html.contains("app.js?v=1.12.7"));
+        assert!(html.contains("lib/x.js?v=1.12.7"));
+        assert!(!html.contains("__OBSIDIAN_SCRIPTS__"));
+    }
+
+    #[tokio::test]
+    async fn serves_static_asset_and_404_missing() {
+        let (_d, reg, cfg) = static_fixture();
+        let r = app_with_static(Arc::clone(&reg), cfg.clone())
+            .oneshot(
+                Request::builder()
+                    .uri("/assets/overrides.css")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(r.status(), StatusCode::OK);
+        let b = axum::body::to_bytes(r.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        assert_eq!(&b[..], b"body{}");
+
+        let r2 = app_with_static(reg, cfg)
+            .oneshot(
+                Request::builder()
+                    .uri("/assets/missing.css")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(r2.status(), StatusCode::NOT_FOUND);
+    }
+
+    #[tokio::test]
+    async fn cache_control_versioned_and_unversioned() {
+        let (_d, reg, cfg) = static_fixture();
+        let versioned = app_with_static(Arc::clone(&reg), cfg.clone())
+            .oneshot(
+                Request::builder()
+                    .uri("/assets/overrides.css?v=1.12.7")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            versioned
+                .headers()
+                .get(axum::http::header::CACHE_CONTROL)
+                .unwrap(),
+            "public, max-age=31536000, immutable"
+        );
+        let plain = app_with_static(reg, cfg)
+            .oneshot(
+                Request::builder()
+                    .uri("/assets/overrides.css")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            plain
+                .headers()
+                .get(axum::http::header::CACHE_CONTROL)
+                .unwrap(),
+            "public, max-age=300"
+        );
+    }
+
+    #[tokio::test]
+    async fn vault_files_served_traversal_rejected_unknown_404() {
+        let (_d, reg, cfg) = static_fixture();
+        let ok = app_with_static(Arc::clone(&reg), cfg.clone())
+            .oneshot(
+                Request::builder()
+                    .uri("/vault-files/Games/pic.png")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(ok.status(), StatusCode::OK);
+        let b = axum::body::to_bytes(ok.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        assert_eq!(&b[..], b"PNGDATA");
+
+        // a traversal attempt must NOT serve external content (400 rejected or 404 not-found)
+        let bad = app_with_static(Arc::clone(&reg), cfg.clone())
+            .oneshot(
+                Request::builder()
+                    .uri("/vault-files/Games/..%2f..%2fsecret.txt")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_ne!(bad.status(), StatusCode::OK);
+
+        let nv = app_with_static(reg, cfg)
+            .oneshot(
+                Request::builder()
+                    .uri("/vault-files/Nope/x.png")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(nv.status(), StatusCode::NOT_FOUND);
+    }
+
+    #[tokio::test]
+    async fn api_routes_still_work_alongside_static() {
+        let (_d, reg, cfg) = static_fixture();
+        let r = app_with_static(reg, cfg)
+            .oneshot(
+                Request::builder()
+                    .uri("/api/fs/tree?vault=Games")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(r.status(), StatusCode::OK);
     }
 }

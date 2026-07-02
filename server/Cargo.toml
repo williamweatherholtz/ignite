@@ -21,10 +21,12 @@ arc-swap = "1"
 notify-debouncer-full = "0.3"
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "time", "sync"] }
 axum = { version = "0.8", features = ["ws"] }
-tower-http = { version = "0.6", features = ["compression-gzip", "compression-br"] }
+tower-http = { version = "0.6", features = ["compression-gzip", "compression-br", "fs"] }
 futures-util = "0.3"
 base64 = "0.22"
 filetime = "0.2"
+regex = "1"
+mime_guess = "2"
 
 [dev-dependencies]
 tempfile = "3"
