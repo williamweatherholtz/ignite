@@ -149,6 +149,17 @@ package IgniteIssues {
         :>> severity = Severity::Medium;
     }
 
+    part issue014 : Issue {
+        :>> id = "b348d0b5-06ca-4b91-b715-8d62346e6992";
+        :>> title = "Blank page / no error when 0 vaults or missing assets (should fail loud, not silent)";
+        :>> createdAt = "2026-07-02";
+        :>> createdBy = "will";
+        :>> description = "Field feedback from the sprint15 Docker demo: with 0 vaults mounted, the browser showed nothing and there was no useful error - GET / returned a bare empty 500 (index_handler mapped build_shell errors to StatusCode::INTERNAL_SERVER_ERROR with no body), and startup logged only a terse 'indexed 0 vault(s)'. A misconfig should produce a CLEAR message, not a blank/opaque failure. RESOLVED by sprint16 (storyRobustStartup): a friendly no-vaults page, path-naming shell-error diagnostics, and a loud 0-vaults startup warning.";
+        :>> discoveredInField = true;
+        :>> relatedTask = "storyRobustStartup";
+        :>> severity = Severity::Medium;
+    }
+
     // ---- triage: each Issue is resolved by its IgniteBacklog action (computed when done) ----
     #Resolves dependency from realVaultBench to issue001;
     #Resolves dependency from browserLoadDemo to issue013;
