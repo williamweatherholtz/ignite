@@ -37,7 +37,8 @@ COPY --from=jsbuild /ignis/packages/shim/dist       /app/shim-dist
 COPY --from=jsbuild /ignis/apps/ignis-server/server/assets /app/assets
 COPY --from=jsbuild /ignis/images                   /app/images
 COPY docker/entrypoint.sh /app/entrypoint.sh
-RUN chmod +x /app/entrypoint.sh
+# strip any CR (Windows checkout) so the shebang works in the Linux container, then make executable
+RUN sed -i 's/\r$//' /app/entrypoint.sh && chmod +x /app/entrypoint.sh
 
 ENV VAULT_ROOT=/vaults \
     DATA_ROOT=/app/data \
