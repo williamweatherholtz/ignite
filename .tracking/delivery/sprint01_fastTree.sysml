@@ -29,6 +29,7 @@ package IgniteDeliveryS01 {
         part storyTreeFastDoDR4 : TestResult { :>> id = "6573ccec-f137-4e26-87ac-6c1c9cea113e"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "80d878e"; :>> judgedAt = "2026-06-30"; :>> judgedBy = "ai"; }
         part storyTreeFastDoDR5 : TestResult { :>> id = "d4b60391-326b-44db-b648-236cdc107641"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "272821d"; :>> judgedAt = "2026-06-30"; :>> judgedBy = "ai"; }
         part storyTreeFastDoDR6 : TestResult { :>> id = "1a13d741-e39c-4fe4-a64e-e4dc7db624d8"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "bdd8f40"; :>> judgedAt = "2026-06-30"; :>> judgedBy = "ai"; }
+        part storyTreeFastDoDR7 : TestResult { :>> id = "87f85695-8e6c-4026-a6fb-8749f38a8906"; :>> outcome = VerdictKind::pass; :>> judgedAgainst = "3b97ec1"; :>> judgedAt = "2026-07-02"; :>> judgedBy = "ai"; }
     }
 
     // ---- Ceremony gates (D0047/D0049). Only the refine gate (DoR) has passed: the sprint is PLANNED. ----

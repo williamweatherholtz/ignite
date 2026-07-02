@@ -7,3 +7,4 @@ task: storyLiveIndex | server/src/index.rs server/src/registry.rs server/src/app
 task: storyWsLiveSync | server/src/ws.rs server/src/index.rs server/src/app.rs server/src/lib.rs server/Cargo.toml
 task: storyFsCrud | server/src/fs_routes.rs server/src/app.rs server/src/lib.rs server/Cargo.toml
 task: storyBootstrapVault | server/src/vault_routes.rs server/src/app.rs server/src/lib.rs server/Cargo.toml
+task: storyStaticServing | server/src/static_routes.rs server/src/app.rs server/src/lib.rs server/Cargo.toml
