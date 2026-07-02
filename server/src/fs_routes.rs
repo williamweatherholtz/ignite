@@ -6,7 +6,10 @@
 use crate::registry::VaultRegistry;
 use axum::{
     extract::{Query, State},
-    http::{header::CONTENT_TYPE, StatusCode},
+    http::{
+        header::{CONTENT_DISPOSITION, CONTENT_TYPE},
+        StatusCode,
+    },
     response::{IntoResponse, Json, Response},
     routing::{delete, get, post},
     Router,
@@ -14,7 +17,7 @@ use axum::{
 use base64::{engine::general_purpose::STANDARD, Engine};
 use serde::Deserialize;
 use serde_json::json;
-use std::io::Write;
+use std::io::{Seek, Write};
 use std::path::{Component, Path, PathBuf};
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -398,6 +401,105 @@ async fn batch_read(
     Ok(Json(json!({ "files": files })))
 }
 
+fn content_disposition(name: &str) -> String {
+    // basic RFC-6266 attachment; strip quotes so the header can't be broken
+    format!("attachment; filename=\"{}\"", name.replace('"', ""))
+}
+fn zip_err(_: zip::result::ZipError) -> ApiError {
+    ApiError::Io(std::io::ErrorKind::Other)
+}
+
+// ---- GET /api/fs/download (single file) ----
+async fn download(
+    State(reg): State<Arc<VaultRegistry>>,
+    Query(q): Query<FsQuery>,
+) -> Result<Response, ApiError> {
+    let p = resolve_q(&reg, &q)?;
+    let meta = std::fs::metadata(&p)?; // missing -> Io(NotFound) -> 404
+    if meta.is_dir() {
+        return Err(ApiError::BadRequest("use /download-zip for directories"));
+    }
+    let bytes = std::fs::read(&p)?;
+    let filename = p
+        .file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    Ok((
+        [
+            (CONTENT_TYPE, "application/octet-stream".to_string()),
+            (CONTENT_DISPOSITION, content_disposition(&filename)),
+        ],
+        bytes,
+    )
+        .into_response())
+}
+
+// ---- GET /api/fs/download-zip (directory as zip; entries prefixed with the folder name; symlinks skipped) ----
+async fn download_zip(
+    State(reg): State<Arc<VaultRegistry>>,
+    Query(q): Query<FsQuery>,
+) -> Result<Response, ApiError> {
+    let p = resolve_q(&reg, &q)?;
+    let meta = std::fs::metadata(&p)?;
+    if !meta.is_dir() {
+        return Err(ApiError::BadRequest("not a directory"));
+    }
+    let folder = p
+        .file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    let buf = zip_directory(&p, &folder)?;
+    Ok((
+        [
+            (CONTENT_TYPE, "application/zip".to_string()),
+            (
+                CONTENT_DISPOSITION,
+                content_disposition(&format!("{folder}.zip")),
+            ),
+        ],
+        buf,
+    )
+        .into_response())
+}
+
+/// Zip a directory in memory. Entries are keyed `<prefix>/<rel>` (Ignis prefixes with the
+/// folder name). Symlinks are skipped so the archive cannot carry an escaping link (fs.js:588-589).
+fn zip_directory(dir: &Path, prefix: &str) -> Result<Vec<u8>, ApiError> {
+    let mut buf = Vec::new();
+    {
+        let mut zw = zip::ZipWriter::new(std::io::Cursor::new(&mut buf));
+        let opts = zip::write::SimpleFileOptions::default()
+            .compression_method(zip::CompressionMethod::Deflated);
+        zip_walk(dir, prefix, &mut zw, opts)?;
+        zw.finish().map_err(zip_err)?;
+    }
+    Ok(buf)
+}
+fn zip_walk<W: Write + Seek>(
+    dir: &Path,
+    prefix: &str,
+    zw: &mut zip::ZipWriter<W>,
+    opts: zip::write::SimpleFileOptions,
+) -> Result<(), ApiError> {
+    for entry in std::fs::read_dir(dir)? {
+        let entry = entry?;
+        let meta = std::fs::symlink_metadata(entry.path())?;
+        if meta.file_type().is_symlink() {
+            continue; // skip symlinks (fs.js:588-589)
+        }
+        let name = entry.file_name().to_string_lossy().into_owned();
+        let zip_path = format!("{prefix}/{name}");
+        if meta.is_dir() {
+            zip_walk(&entry.path(), &zip_path, zw, opts)?;
+        } else {
+            zw.start_file(&zip_path, opts).map_err(zip_err)?;
+            let bytes = std::fs::read(entry.path())?;
+            zw.write_all(&bytes)?;
+        }
+    }
+    Ok(())
+}
+
 /// The fs CRUD routes, to be `.merge`d into the app router (state applied by the caller).
 pub fn routes() -> Router<Arc<VaultRegistry>> {
     Router::new()
@@ -415,6 +517,8 @@ pub fn routes() -> Router<Arc<VaultRegistry>> {
         .route("/api/fs/access", get(access))
         .route("/api/fs/utimes", post(utimes))
         .route("/api/fs/batch-read", post(batch_read))
+        .route("/api/fs/download", get(download))
+        .route("/api/fs/download-zip", get(download_zip))
 }
 
 #[cfg(test)]
@@ -734,6 +838,93 @@ mod tests {
         assert_eq!(
             get(&r, "/api/fs/stat?vault=Nope&path=a.md").await.0,
             StatusCode::NOT_FOUND
+        );
+    }
+
+    #[tokio::test]
+    async fn download_file_returns_bytes_and_disposition() {
+        let (_d, r) = reg();
+        let resp = app(Arc::clone(&r))
+            .oneshot(
+                Request::builder()
+                    .uri("/api/fs/download?vault=Games&path=a.md")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+        let cd = resp
+            .headers()
+            .get("content-disposition")
+            .expect("content-disposition header")
+            .to_str()
+            .unwrap()
+            .to_string();
+        assert!(cd.contains("attachment") && cd.contains("a.md"), "cd={cd}");
+        let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        assert_eq!(&bytes[..], b"hello");
+    }
+
+    #[tokio::test]
+    async fn download_dir_errors_and_missing_is_404() {
+        let (_d, r) = reg();
+        assert_eq!(
+            get(&r, "/api/fs/download?vault=Games&path=sub").await.0,
+            StatusCode::BAD_REQUEST
+        );
+        assert_eq!(
+            get(&r, "/api/fs/download?vault=Games&path=nope.md").await.0,
+            StatusCode::NOT_FOUND
+        );
+    }
+
+    #[tokio::test]
+    async fn download_zip_of_folder_has_prefixed_entries() {
+        let (_d, r) = reg();
+        let (s, bytes) = send(
+            &r,
+            Request::builder()
+                .uri("/api/fs/download-zip?vault=Games&path=sub")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await;
+        assert_eq!(s, StatusCode::OK);
+        let mut zip = zip::ZipArchive::new(std::io::Cursor::new(bytes)).unwrap();
+        let mut got = None;
+        for i in 0..zip.len() {
+            let mut f = zip.by_index(i).unwrap();
+            if f.name() == "sub/b.md" {
+                let mut c = String::new();
+                std::io::Read::read_to_string(&mut f, &mut c).unwrap();
+                got = Some(c);
+            }
+        }
+        assert_eq!(got.as_deref(), Some("world!!"), "zip contains sub/b.md");
+    }
+
+    #[tokio::test]
+    async fn download_zip_of_non_dir_errors() {
+        let (_d, r) = reg();
+        assert_eq!(
+            get(&r, "/api/fs/download-zip?vault=Games&path=a.md")
+                .await
+                .0,
+            StatusCode::BAD_REQUEST
+        );
+    }
+
+    #[tokio::test]
+    async fn download_traversal_rejected() {
+        let (_d, r) = reg();
+        assert_eq!(
+            get(&r, "/api/fs/download?vault=Games&path=../../etc")
+                .await
+                .0,
+            StatusCode::BAD_REQUEST
         );
     }
 }
