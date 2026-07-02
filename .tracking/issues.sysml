@@ -160,6 +160,28 @@ package IgniteIssues {
         :>> severity = Severity::Medium;
     }
 
+    part issue015 : Issue {
+        :>> id = "7e7bc07f-68ec-4be4-bb0a-599f433105d6";
+        :>> title = "Poor debug logging - no per-request logs, hard to diagnose in the field";
+        :>> createdAt = "2026-07-02";
+        :>> createdBy = "will";
+        :>> description = "Field feedback during the Docker demo: 'debug logs aren't that good'. The server logged only a terse startup line and nothing per-request, so when the browser showed nothing there was no way to see what it fetched or what came back. RESOLVED by sprint17: tracing + tracing-subscriber (RUST_LOG, default info) + a log_requests middleware logging method/path/status/latency per request (Ignis-style), making field debugging (incl. the issue013 browser load) visible.";
+        :>> discoveredInField = true;
+        :>> relatedTask = "storyUxObservability";
+        :>> severity = Severity::Medium;
+    }
+
+    part issue016 : Issue {
+        :>> id = "e7b445e1-b159-4b5d-a129-0ee4e9f99cc5";
+        :>> title = "Confusing dual vault config vars (VAULT_ROOT vs VAULTS_DIR)";
+        :>> createdAt = "2026-07-02";
+        :>> createdBy = "will";
+        :>> description = "Field feedback: VAULT_ROOT (container path) and VAULTS_DIR (compose host-path interpolation var) look identical and were repeatedly mis-set (VAULT_ROOT=C:\\vaults; VAULTS_DIR placed in the container environment block) -> 0 vaults + confusion. RESOLVED by sprint17: collapse to ONE knob - VAULT_ROOT is removed from the compose surface (fixed /vaults in the Dockerfile) and VAULTS_DIR is set once in a .env file (compose reads it automatically). .env.example added.";
+        :>> discoveredInField = true;
+        :>> relatedTask = "storyUxObservability";
+        :>> severity = Severity::Medium;
+    }
+
     // ---- triage: each Issue is resolved by its IgniteBacklog action (computed when done) ----
     #Resolves dependency from realVaultBench to issue001;
     #Resolves dependency from browserLoadDemo to issue013;

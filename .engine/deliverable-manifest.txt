@@ -15,3 +15,4 @@ task: storyDownload | server/src/fs_routes.rs server/src/app.rs server/Cargo.tom
 task: storyHeadlessSync | server/src/headless_sync.rs server/src/plugins.rs server/src/ws.rs server/src/app.rs server/src/lib.rs
 task: storyDockerImage | Dockerfile docker/entrypoint.sh docker-compose.yml docker-compose.stack.yml Caddyfile
 task: storyRobustStartup | server/src/main.rs server/src/static_routes.rs server/src/app.rs
+task: storyUxObservability | server/src/main.rs server/src/app.rs server/Cargo.toml
